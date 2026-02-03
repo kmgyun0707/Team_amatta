@@ -85,59 +85,111 @@ def main(args=None):
     navigator.undock()
 
     
-    visited_spots = [0, 6, 3, 8]        # 추후 DB에서 읽어오도록 수정 필요
+    visited_spots = []        # 추후 DB에서 읽어오도록 수정 필요
+
+    while True:
+        try:
+            user_input = input("\n방문할 장소의 인덱스를 공백으로 구분해 입력하세요 (예: 0 2 3): ")
+            if not user_input.strip():
+                print("입력값이 없습니다. 다시 입력해주세요.")
+                continue
+
+            # 문자열을 정수 리스트로 변환
+            # set()을 사용하여 중복 입력 방지 (예: 1 1 2 -> 1 2)
+            input_indices = list(set(map(int, user_input.split())))
+
+            # 유효성 검사: 입력된 인덱스가 goal_options 범위 내에 있는지 확인
+            invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(goal_options)]
+            
+            if invalid_indices:
+                print(f"오류: 존재하지 않는 인덱스가 포함되어 있습니다: {invalid_indices}")
+                continue
+            
+            visited_spots = input_indices
+            break
+
+        except ValueError:
+            print("오류: 숫자만 입력해주세요.")
+    
+    print(f"\n선택된 방문 장소 인덱스: {visited_spots}")
+    # ============================================================
+
+    if not visited_spots:
+        navigator.info("No targets selected. Exiting.")
+        return
 
     # Prepare goal pose options
+    # goal_options = [
+    #     # 0 입구 (Entrance)
+    #     {'name': 'Entrance',
+    #      'pose': create_pose(navigator, -3.26, 0.95, 0.9881, 0.1536)},
+
+    #     # 1 은행 (Bank)
+    #     {'name': 'Bank',
+    #      'pose': create_pose(navigator, -1.91, 0.71, 0.4327, 0.9015)},
+
+    #     # 2 카운터 (Counter)
+    #     {'name': 'Counter',
+    #      'pose': create_pose(navigator, -0.54, 0.77, 0.7177, 0.6963)},
+
+    #     # 3 벤치1 (Bench 1)
+    #     {'name': 'Bench_1',
+    #      'pose': create_pose(navigator, -0.54, -0.87, -0.7689, 0.6394)},
+
+    #     # 4 벤치2 (Bench 2)
+    #     {'name': 'Bench_2',
+    #      'pose': create_pose(navigator, -0.83, -2.24, 0.58, 0.8146)},
+
+    #     # 5 여자화장실 (Ladies Room)
+    #     {'name': 'Ladies_Room',
+    #      'pose': create_pose(navigator, -0.47, -3.87, -0.1166, 0.9931)},
+
+    #     # 6 Gate 1
+    #     {'name': 'Gate_1',
+    #      'pose': create_pose(navigator, -0.76, -4.44, -0.6276, 0.7785)},
+
+    #     # 7 Gate 2
+    #     {'name': 'Gate_2',
+    #      'pose': create_pose(navigator, -2.10, -4.16, -0.7512, 0.66)},
+
+    #     # 8 면세점 (Duty Free)
+    #     {'name': 'Duty_Free',
+    #      'pose': create_pose(navigator, -2.22, -1.98, -0.9927, 0.1203)},
+
+    #     # 9 남자화장실 (Mens Room)
+    #     {'name': 'Mens_Room',
+    #      'pose': create_pose(navigator, -3.29, -0.10, 0.9980, 0.0631)}
+    # ]
+    # Prepare goal pose options: Rviz에서 맞는지 확인할 것
     goal_options = [
-        # 0 입구 (Entrance)
-        {'name': 'Entrance',
-         'pose': create_pose(navigator, -3.26, 0.95, 0.9881, 0.1536)},
-
-        # 1 은행 (Bank)
-        {'name': 'Bank',
-         'pose': create_pose(navigator, -1.91, 0.71, 0.4327, 0.9015)},
-
-        # 2 카운터 (Counter)
-        {'name': 'Counter',
-         'pose': create_pose(navigator, -0.54, 0.77, 0.7177, 0.6963)},
-
-        # 3 벤치1 (Bench 1)
-        {'name': 'Bench_1',
-         'pose': create_pose(navigator, -0.54, -0.87, -0.7689, 0.6394)},
-
-        # 4 벤치2 (Bench 2)
-        {'name': 'Bench_2',
-         'pose': create_pose(navigator, -0.83, -2.24, 0.58, 0.8146)},
-
-        # 5 여자화장실 (Ladies Room)
-        {'name': 'Ladies_Room',
-         'pose': create_pose(navigator, -0.47, -3.87, -0.1166, 0.9931)},
-
-        # 6 Gate 1
+        # 0
         {'name': 'Gate_1',
-         'pose': create_pose(navigator, -0.76, -4.44, -0.6276, 0.7785)},
+         'pose': create_pose(navigator, -0.76, -1.59, 0.9881, 0.1536)},
 
-        # 7 Gate 2
-        {'name': 'Gate_2',
-         'pose': create_pose(navigator, -2.10, -4.16, -0.7512, 0.66)},
-
-        # 8 면세점 (Duty Free)
+        # 1
         {'name': 'Duty_Free',
-         'pose': create_pose(navigator, -2.22, -1.98, -0.9927, 0.1203)},
+         'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)},
 
-        # 9 남자화장실 (Mens Room)
+        # 2 
         {'name': 'Mens_Room',
-         'pose': create_pose(navigator, -3.29, -0.10, 0.9980, 0.0631)}
-    ]
+         'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)}, # 남자화장실 좌표 찍어야 함
 
+        # 3
+        {'name': 'Counter',
+         'pose': create_pose(navigator, -0.584, 3.64, -0.7689, 0.6394)}
+
+    ]
     navigator.info('Welcome to the mail delivery service.')
 
-    # visited_spots 순서대로 탐색
-    for index in visited_spots:
-        if index < 0 or index >= len(goal_options):
-            navigator.error(f'Invalid index: {index}. Skipping.')
-            continue
+    best_route, total_dist = find_best_route_brute_force(initial_pose, visited_spots, goal_options)
 
+    # 계산된 경로 출력
+    path_names = [goal_options[i]['name'] for i in best_route]
+    navigator.info(f'Best Route Found: {path_names}')
+    # navigator.info(f'Estimated Total Distance: {total_dist:.2f} meters')
+
+    # visited_spots 순서대로 탐색
+    for index in best_route:
         target_name = goal_options[index]['name']
         target_pose = goal_options[index]['pose']
 
