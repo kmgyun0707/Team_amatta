@@ -5,7 +5,7 @@ from web.ad_login import ad_login_bp
 from web.ad_load_db import ad_load_db_bp
 from web.ad_detect import ad_detect_bp
 from web.user_load_db import user_load_db_bp
-# from web.user_login import user_login_bp
+from web.user_login import user_login_bp
 from web.lost_report import lost_report_bp
 from web.guide_start import guide_start_bp
 
@@ -18,7 +18,7 @@ def create_app():
 
     app.secret_key = "amatta"
 
-    # app.register_blueprint(user_login_bp)     # qr찍자마자 load_db 보이기
+    app.register_blueprint(user_login_bp)       # qr찍자마자 load_db 보이기
     app.register_blueprint(user_load_db_bp)     # /user_load, /filter
     app.register_blueprint(lost_report_bp)      # 
     app.register_blueprint(guide_start_bp)
