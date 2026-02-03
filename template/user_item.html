@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>분실물 찾기</title>
+    <style>
+        .container { width: 400px; margin: 0 auto; border: 2px solid #ccc; padding: 20px; border-radius: 20px; text-align: center; }
+        .filter-section { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .item-card { background: #eee; border-radius: 15px; padding: 10px; font-size: 12px; }
+        .image-box { width: 100%; height: 100px; background: #ccc; border-radius: 10px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>무엇을 잃어버리셨나요?</h2>
+        
+        <div class="filter-section">
+            <select id="category" onchange="loadItems()">
+                <option value="전체">종류 (전체)</option>
+                <option value="지갑, 카드지갑">지갑</option>
+                <option value="블루투스 이어폰, 이어폰">이어폰</option>
+                <option value="백팩, 가방, 핸드백, 쇼핑백">가방</option>
+                <option value="핸드폰, 스마트폰">스마트폰</option>
+            </select>
+            <select id="color" onchange="loadItems()">
+                <option value="전체">색상 (전체)</option>
+                <option value="빨강색">빨강색</option>
+                <option value="주황색">주황색</option>
+                <option value="노란색">노란색</option>
+                <option value="초록색">초록색</option>
+                <option value="파랑색">파랑색</option>
+                <option value="남색">남색</option>
+                <option value="검정색">검정색</option>
+                <option value="화이트">화이트</option>
+                <option value="투명">투명</option>
+            </select>
+        </div>
+
+        <div class="grid" id="item-list">
+            </div>
+    </div>
+
+    <script>
+        function loadItems() {
+            const category = document.getElementById('category').value;
+            const color = document.getElementById('color').value;
+
+            fetch(`/filter?category=${category}&color=${color}`)
+                .then(response => response.json())
+                .then(data => {
+                    const list = document.getElementById('item-list');
+                    list.innerHTML = ''; // 기존 목록 초기화
+                    
+                    data.forEach(item => {
+                        list.innerHTML += `
+                            <div class="item-card">
+                                <div class="image-box"></div>
+                                <div>장소: ${item.location_x}, ${item.location_y}</div>
+                                <div>시간: ${item.time}</div>
+                            </div>
+                        `;
+                    });
+                });
+        }
+        // 페이지 로드 시 처음 한 번 실행
+        window.onload = loadItems;
+    </script>
+</body>
+</html>

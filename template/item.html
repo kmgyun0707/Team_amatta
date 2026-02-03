@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Item Tables</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 24px;
+        }
+        .table-box {
+            width: 50%;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 13px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        th {
+            background: #f2f2f2;
+        }
+        h2 {
+            margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>DB 테이블 현황</h1>
+<p style="color:#666">DB 경로: {{ db_path }}</p>
+
+<div class="container">
+
+    <!-- item 테이블 -->
+    <div class="table-box">
+        <h2>item</h2>
+        {% if item %}
+        <table>
+            <thead>
+                <tr>
+                    {% for c in item_cols %}
+                        <th>{{ c }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in item %}
+                <tr>
+                    {% for c in item_cols %}
+                        <td>{{ row[c] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>데이터 없음</p>
+        {% endif %}
+    </div>
+
+    <!-- item_lost 테이블 -->
+    <div class="table-box">
+        <h2>item_lost</h2>
+        {% if lost_item %}
+        <table>
+            <thead>
+                <tr>
+                    {% for c in lost_cols %}
+                        <th>{{ c }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in lost_item %}
+                <tr>
+                    {% for c in lost_cols %}
+                        <td>{{ row[c] }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <p>데이터 없음</p>
+        {% endif %}
+    </div>
+</div>
+<div style="margin-top: 32px; text-align: center;">
+    <a href="/ad_detect">
+        <button style="
+            padding: 12px 24px;
+            font-size: 15px;
+            cursor: pointer;
+        ">
+            실시간 로봇
+        </button>
+    </a>
+    <a href="{{ url_for('ad_login.logout') }}">
+        <button style="
+            padding: 12px 24px;
+            font-size: 15px;
+            cursor: pointer;
+        ">
+            logout
+        </button>
+    </a>
+</div>
+
+</body>
+</html>
