@@ -1,4 +1,4 @@
-from flask import render_template, request, jsonify, Blueprint
+from flask import render_template, request, jsonify, Blueprint, redirect, url_for, session, flash
 import sqlite3
 
 user_load_db_bp = Blueprint("user_load_db", __name__)
@@ -12,6 +12,9 @@ def get_db_connection():
 
 @user_load_db_bp.route("/user_load")
 def index():
+    if 'username' not in session:
+        flash('로그인이 필요합니다.', 'warning')
+        return redirect(url_for('user_login.user_login'))
     return render_template('user_item.html')
 
 @user_load_db_bp.route("/filter", methods=["GET"])

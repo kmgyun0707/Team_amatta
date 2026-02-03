@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>분실물 신고</title>
+  <style>
+    body { font-family: sans-serif; }
+    .box {
+      width: 420px;
+      margin: 60px auto;
+      border: 2px solid #ccc;
+      border-radius: 20px;
+      padding: 20px;
+    }
+    label { display:block; margin-top: 12px; font-size: 13px; }
+    input, select {
+      width: 100%;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      margin-top: 6px;
+    }
+    .checks label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 10px;
+      margin-top: 8px;
+    }
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+    }
+    .back {
+      background: #eee;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h2>분실물 신고</h2>
+
+    <form method="POST">
+      <label>이름</label>
+      <input name="name" required>
+
+      <label>전화번호</label>
+      <input name="phone" required>
+
+      <label>분실물 종류</label>
+      <select name="category" required>
+        <option value="">선택</option>
+        <option value="지갑">지갑</option>
+        <option value="가방">가방</option>
+        <option value="스마트폰">스마트폰</option>
+        <option value="이어폰">이어폰</option>
+      </select>
+
+      <label>색상</label>
+      <select name="color" required>
+        <option value="">선택</option>
+        <option value="검정색">검정색</option>
+        <option value="화이트">화이트</option>
+        <option value="파랑색">파랑색</option>
+      </select>
+
+      <label>방문 장소 (복수 선택)</label>
+      <div class="checks">
+        <label><input type="checkbox" name="location" value="벤치">벤치</label>
+        <label><input type="checkbox" name="location" value="화장실">화장실</label>
+        <label><input type="checkbox" name="location" value="라운지">라운지</label>
+      </div>
+
+      <label>분실 시간</label>
+      <input type="datetime-local" name="time">
+
+      <button type="submit">신고 접수</button>
+    </form>
+
+    <button class="back" onclick="location.href='/user_load'">돌아가기</button>
+  </div>
+</body>
+</html>

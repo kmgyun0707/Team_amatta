@@ -18,7 +18,7 @@ def user_login():
             # Store username in session and redirect to welcome
             session['username'] = username
             flash('Login successful!', 'success')
-            return redirect(url_for('user_load_db.user_load_db'))
+            return redirect(url_for('user_load_db.index'))
         else:
             flash('Invalid username or password!', 'danger')
             return redirect(url_for('user_login.user_login'))
