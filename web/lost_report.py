@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect
 import sqlite3
 from datetime import datetime
 
@@ -13,13 +13,13 @@ def get_db():
 
 
 # 신고 입력 화면
-@lost_report_bp.route("/lost_report", methods=["GET"])
+@lost_report_bp.route("/lost_report", methods=["GET"])  # html파일을 불러오기 위한 라우트
 def lost_report_page():
     return render_template("lost_report.html")
 
 
 # 신고 저장 처리
-@lost_report_bp.route("/lost_report", methods=["POST"])
+@lost_report_bp.route("/lost_report", methods=["POST"])  # 입력된 값을 저장하기 위한 라우트
 def lost_report_submit():
     name = request.form.get("name")
     phone = request.form.get("phone")
@@ -31,9 +31,10 @@ def lost_report_submit():
     if not time_value:
         time_value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    location_text = ", ".join(locations)
+    location_text = ", ".join(locations)        # 입력된 리스트를 문자열로 합치기
 
     conn = get_db()
+    # SQL실행 item_lost 테이블에 입력값을 저장 (state는 '접수')
     conn.execute(
         """
         INSERT INTO item_lost
@@ -42,6 +43,7 @@ def lost_report_submit():
         """,
         (name, phone, category, color, time_value, location_text, "접수")
     )
+    # INSERT 결과를 실제 DB에 실제로 반영
     conn.commit()
     conn.close()
 
