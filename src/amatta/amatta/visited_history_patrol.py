@@ -1,32 +1,44 @@
 # robot 1 구동하는 코드: 사용자가 입력한 이동 경로를 따라 탐색
 import rclpy
+from rclpy.node import Node
+
 import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_simple_commander.robot_navigator import TaskResult
+from std_msgs.msg import Int32MultiArray
 
-class VisitedHistoryPatrol:
+
+class VisitedHistoryPatrol(Node):
     """
     사용자가 방문했던 장소들(History)을 입력받아,
     최단 거리로 해당 장소들을 순찰(Retrace)하는 클래스
     """
     def __init__(self):
+        super().__init__('visited_history_patrol')
         self.navigator = TurtleBot4Navigator()
 
-        # 1. 초기화 및 Docking 상태 확인
-        if not self.navigator.getDockedStatus():
-            self.navigator.info('Docking before initialising pose')
-            self.navigator.dock()
+        # [추가] 토픽 수신 여부와 데이터를 저장할 변수
+        self.visited_spot = []              # 사용자의 방문 이력
+        self.is_data_received = False       # 데이터 서브스크라이브 여부
 
-        # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
-        self.navigator.setInitialPose(initial_pose)
+        self.subscription = self.create_subscription(
+            Int32MultiArray,
+            '/visited_spot',
+            self.topic_callback,
+            10
+        )
 
-        # 3. Nav2 활성화 대기 및 Undock
-        self.navigator.waitUntilNav2Active()
-        self.navigator.undock()
+        self.subscription_pose = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/robot3/amcl_pose',
+            self.pose_callback,
+            10
+        )
+
+        
 
         # 4. 목표 지점(장소 DB) 정의
         self.goal_options = [
@@ -72,6 +84,31 @@ class VisitedHistoryPatrol:
             {'name': 'Gate_2',
             'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
         ]
+
+        # 1. 초기화 및 Docking 상태 확인
+        if not self.navigator.getDockedStatus():
+            self.navigator.info('Docking before initialising pose')
+            self.navigator.dock()
+
+        # 2. 초기 위치 설정
+        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        self.navigator.setInitialPose(initial_pose)
+
+        # 3. Nav2 활성화 대기 및 Undock
+        self.navigator.waitUntilNav2Active()
+        self.navigator.undock()
+
+    def topic_callback(self, msg):
+        self.get_logger().info(f"Topic Received! Data: {msg.data}")
+        self.visited_spot= list(msg.data)
+        self.is_data_received = True
+
+    def pose_callback(self, msg):
+        # AMCL은 PoseWithCovarianceStamped를 주지만, 
+        # 우리가 필요한 건 PoseStamped이므로 변환해서 저장합니다.
+        self.current_pose = PoseStamped()
+        self.current_pose.header = msg.header
+        self.current_pose.pose = msg.pose.pose
         
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
@@ -117,53 +154,54 @@ class VisitedHistoryPatrol:
                 
         return best_order, min_distance
 
-    def get_user_history(self):
-        """사용자로부터 방문했던 장소(이력)를 입력받음"""
-        print("\n" + "="*40)
-        print("      [ 장소 목록 (Location DB) ]")
-        for i, option in enumerate(self.goal_options):
-            print(f"  {i} : {option['name']}")
-        print("="*40)
+    # def get_user_history(self):
+    #     """사용자로부터 방문했던 장소(이력)를 입력받음"""
+    #     print("\n" + "="*40)
+    #     print("      [ 장소 목록 (Location DB) ]")
+    #     for i, option in enumerate(self.goal_options):
+    #         print(f"  {i} : {option['name']}")
+    #     print("="*40)
 
-        while True:
-            try:
-                # 멘트 수정: 방문했던 장소를 묻는 형태로 변경
-                user_input = input("\n사용자가 방문했던 장소의 번호를 공백으로 구분해 입력하세요 (예: 0 2): ")
+    #     while True:
+    #         try:
+    #             # 멘트 수정: 방문했던 장소를 묻는 형태로 변경
+    #             user_input = input("\n사용자가 방문했던 장소의 번호를 공백으로 구분해 입력하세요 (예: 0 2): ")
                 
-                if not user_input.strip():
-                    print("입력값이 없습니다. 다시 입력해주세요.")
-                    continue
+    #             if not user_input.strip():
+    #                 print("입력값이 없습니다. 다시 입력해주세요.")
+    #                 continue
 
-                input_indices = list(set(map(int, user_input.split())))
+    #             input_indices = list(set(map(int, user_input.split())))
 
-                # 유효성 검사
-                invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
-                if invalid_indices:
-                    print(f"오류: 존재하지 않는 장소 번호입니다: {invalid_indices}")
-                    continue
+    #             # 유효성 검사
+    #             invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
+    #             if invalid_indices:
+    #                 print(f"오류: 존재하지 않는 장소 번호입니다: {invalid_indices}")
+    #                 continue
                 
-                return input_indices
+    #             return input_indices
 
-            except ValueError:
-                print("오류: 숫자만 입력해주세요.")
+    #         except ValueError:
+    #             print("오류: 숫자만 입력해주세요.")
 
-    def run_trace(self):
+    def run_patrol(self):
         self.navigator.info('Initializing User History Tracer...')
 
         # 1. 방문 이력 입력 받기
-        visited_history = self.get_user_history()
-        print(f"\n입력된 방문 이력: {visited_history}")
+        # visited_history = self.get_user_history()
+        # print(f"\n입력된 방문 이력: {visited_history}")
 
-        if not visited_history:
-            self.navigator.info("No history provided. Exiting.")
+        if not self.visited_spot:
+            self.navigator.info("No visited_spot provided. Exiting.")
             return
 
-        # 2. 최적 경로(순서) 계산
-        # 로봇은 (0,0)에서 출발한다고 가정 (혹은 현재 위치 get_pose() 사용 가능)
-        initial_pose = self.create_pose(0.0, 0.0, 0.0, 1.0) 
+        if self.current_pose is not None:
+            start_pose = self.current_pose
+        else:
+            self.get_logger().warn('No Pose')
         
         self.navigator.info('Calculating best route to retrace steps...')
-        best_route, _ = self.find_best_route_brute_force(initial_pose, visited_history)
+        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)
 
         path_names = [self.goal_options[i]['name'] for i in best_route]
         print("\n" + "*"*50)
@@ -197,7 +235,24 @@ def main(args=None):
     
     # 클래스 인스턴스 생성 및 실행
     tracer = VisitedHistoryPatrol()
-    tracer.run_trace()
+
+    try:
+        # [핵심 수정] 데이터가 들어올 때까지 Node를 Spin(대기) 시킵니다.
+        while rclpy.ok():
+            rclpy.spin_once(tracer, timeout_sec=0.1)
+            
+            if tracer.is_data_received:
+                # 데이터를 받으면 순찰 시작
+                tracer.run_patrol()
+                break # 순찰이 끝나면 프로그램 종료 (계속 대기하려면 break 제거 및 플래그 초기화)
+                
+    except KeyboardInterrupt:
+        pass
+    finally:
+        tracer.destroy_node()
+        rclpy.shutdown()
+
+    
     
     rclpy.shutdown()
 
