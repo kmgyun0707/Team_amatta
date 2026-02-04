@@ -279,6 +279,9 @@ class LostItemPatrol(Node):
             elif result == TaskResult.FAILED:
                 self.navigator.error(f'Failed to reach {target_name}.')
 
+        if not self.is_detected:
+            self.navigator.info('DB Upload')
+
         self.navigator.info('All tasks completed. Returning to dock...')
 
 def main(args=None):
