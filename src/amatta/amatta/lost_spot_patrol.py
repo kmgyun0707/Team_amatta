@@ -1,38 +1,39 @@
 # robot 3 구동하는 코드: 사용자의 이동 경로를 제외한 주요 구역 탐색
 import rclpy
+from rclpy.node import Node
 import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_simple_commander.robot_navigator import TaskResult
+from std_msgs.msg import Int32MultiArray
 
-class LostItemPatrol:
+class LostItemPatrol(Node):
     def __init__(self):
+        super().__init__('lost_item_patrol')
+
         self.navigator = TurtleBot4Navigator()
 
-        # 1. 초기화 및 Docking 상태 확인
-        if not self.navigator.getDockedStatus():
-            self.navigator.info('Docking before initialising pose')
-            self.navigator.dock()
+        # [추가] 토픽 수신 여부와 데이터를 저장할 변수
+        self.visited_spot = []              # 사용자의 방문 이력
+        self.is_data_received = False       # 데이터 서브스크라이브 여부
 
-        # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
-        self.navigator.setInitialPose(initial_pose)
+        self.subscription = self.create_subscription(
+            Int32MultiArray,
+            '/visited_spot',
+            self.topic_callback,
+            10
+        )
 
-        # 3. Nav2 활성화 대기 및 Undock
-        self.navigator.waitUntilNav2Active()
-        self.navigator.undock()
+        self.subscription_pose = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/robot3/amcl_pose',
+            self.pose_callback,
+            10
+        )
 
-        # 4. 목표 지점(Goal Options) 정의
-        self.goal_options = [
-            {'name': 'Gate_1',    'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
-            {'name': 'Duty_Free', 'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
-            {'name': 'Mens_Room', 'pose': self.create_pose(-3.23, 2.73, 0.7177, 0.6963)},
-            {'name': 'Counter',   'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)}
-        ]
-        
-        # robot 3 좌표 기준
+        # 목표 지점 정의 (robot 3 좌표 기준)
         self.goal_options = [
             # 0 입구 (Entrance)
             {'name': 'Entrance',
@@ -77,6 +78,31 @@ class LostItemPatrol:
              'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
         ]
 
+         # 1. 초기화 및 Docking 상태 확인
+        if not self.navigator.getDockedStatus():
+            self.navigator.info('Docking before initialising pose')
+            self.navigator.dock()
+
+        # 2. 초기 위치 설정
+        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        self.navigator.setInitialPose(initial_pose)
+
+        # 3. Nav2 활성화 대기 및 Undock
+        self.navigator.waitUntilNav2Active()
+        self.navigator.undock()
+    
+    def topic_callback(self, msg):
+        self.get_logger().info(f"Topic Received! Data: {msg.data}")
+        self.visited_spot_raw = list(msg.data)
+        self.is_data_received = True
+
+    def pose_callback(self, msg):
+        # AMCL은 PoseWithCovarianceStamped를 주지만, 
+        # 우리가 필요한 건 PoseStamped이므로 변환해서 저장합니다.
+        self.current_pose = PoseStamped()
+        self.current_pose.header = msg.header
+        self.current_pose.pose = msg.pose.pose
+
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
         pose.header.frame_id = 'map'
@@ -89,6 +115,18 @@ class LostItemPatrol:
         pose.pose.orientation.z = float(z_orient)
         pose.pose.orientation.w = float(w_orient)
         return pose
+    
+    # def get_offset_pose(self, target_x, target_y, offset_dist=0.1):
+    #     """
+    #     현재 로봇 위치에서 타겟 위치를 바라보는 방향으로, 
+    #     타겟보다 offset_dist 만큼 덜 간 위치를 계산하여 반환
+    #     """
+    #     # 현재 로봇의 위치 가져오기 (피드백이 없으면 0,0 처리)
+    #     feedback = self.navigator.getFeedback()
+    #     if feedback:
+    #         self.initial_pose = feedback.current_pose
+    #     else:
+    #         self.get_logger().info('로봇 위치를 못 불러옵니다.')
 
     def get_distance(self, pose1, pose2):
         x1 = pose1.pose.position.x
@@ -119,60 +157,60 @@ class LostItemPatrol:
                 
         return best_order, min_distance
 
-    def get_user_input(self):
-        """사용자 입력을 받아 제외할 곳을 뺀 방문 리스트를 반환"""
-        all_indices = list(range(len(self.goal_options)))
+    # def get_user_input(self):
+    #     """사용자 입력을 받아 제외할 곳을 뺀 방문 리스트를 반환"""
+    #     all_indices = list(range(len(self.goal_options)))
         
-        print("\n" + "="*40)
-        print("      [ 전체 장소 목록 ]")
-        for i, option in enumerate(self.goal_options):
-            print(f"  {i} : {option['name']}")
-        print("="*40)
+    #     print("\n" + "="*40)
+    #     print("      [ 전체 장소 목록 ]")
+    #     for i, option in enumerate(self.goal_options):
+    #         print(f"  {i} : {option['name']}")
+    #     print("="*40)
 
-        while True:
-            try:
-                user_input = input("\n탐색에서 제외할 장소의 번호를 공백으로 구분해 입력하세요 (엔터 시 전체 탐색): ")
+    #     while True:
+    #         try:
+    #             user_input = input("\n탐색에서 제외할 장소의 번호를 공백으로 구분해 입력하세요 (엔터 시 전체 탐색): ")
                 
-                # 입력이 없으면 전체 방문
-                if not user_input.strip():
-                    print("제외할 장소가 없습니다. 모든 장소를 탐색합니다.")
-                    return all_indices
+    #             # 입력이 없으면 전체 방문
+    #             if not user_input.strip():
+    #                 print("제외할 장소가 없습니다. 모든 장소를 탐색합니다.")
+    #                 return all_indices
 
-                input_indices = list(set(map(int, user_input.split())))
+    #             input_indices = list(set(map(int, user_input.split())))
 
-                # 유효성 검사
-                invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
-                if invalid_indices:
-                    print(f"오류: 존재하지 않는 인덱스입니다: {invalid_indices}")
-                    continue
+    #             # 유효성 검사
+    #             invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
+    #             if invalid_indices:
+    #                 print(f"오류: 존재하지 않는 인덱스입니다: {invalid_indices}")
+    #                 continue
                 
-                # 차집합 계산 (전체 - 제외)
-                visited_spots = [idx for idx in all_indices if idx not in input_indices]
-                return visited_spots
+    #             # 차집합 계산 (전체 - 제외)
+    #             visited_spots = [idx for idx in all_indices if idx not in input_indices]
+    #             return visited_spots
 
-            except ValueError:
-                print("오류: 숫자만 입력해주세요.")
+    #         except ValueError:
+    #             print("오류: 숫자만 입력해주세요.")
 
     def run_patrol(self):
         # 1. 방문할 장소 결정
-        visited_spots = self.get_user_input()
-        print(f"\n최종 방문할 장소 인덱스: {visited_spots}")
+        all_indices = list(range(len(self.goal_options)))
+        self.visited_spot = [idx for idx in all_indices if idx not in self.visited_spot_raw]
+        
+        print(f"\n최종 방문할 장소 인덱스: {self.visited_spot}")
 
-        if not visited_spots:
+        if not self.visited_spot:
             self.navigator.info("No targets selected. Exiting.")
             return
 
         self.navigator.info('Starting patrol service...')
 
-        # 2. 최적 경로 계산
-        # 현재 로봇의 위치(initial pose)를 시작점으로 설정
-        # (주의: 실제 이동 후에는 get_pose_stamped() 등으로 현재 위치를 갱신해서 써야 할 수도 있음, 
-        #  여기서는 초기 위치가 0,0이라고 가정하고 시작)
-        current_robot_pose = self.goal_options[0]['pose'] # 임시: 타입 맞추기용, 실제론 (0,0) Pose 생성해서 넣는게 정확함.
-        # 정확히 하려면:
-        initial_pose = self.create_pose(0.0, 0.0, 0.0, 1.0) # 초기 위치
+        if self.current_pose is not None:
+            start_pose = self.current_pose
+        else:
+            self.get_logger().warn('No Pose')
+
         
-        best_route, _ = self.find_best_route_brute_force(initial_pose, visited_spots)
+        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)
 
         path_names = [self.goal_options[i]['name'] for i in best_route]
         self.navigator.info(f'Optimized Route: {path_names}')
@@ -203,9 +241,22 @@ def main(args=None):
     rclpy.init(args=args)
     
     patrol_robot = LostItemPatrol()
-    patrol_robot.run_patrol()
     
-    rclpy.shutdown()
+    try:
+        # [핵심 수정] 데이터가 들어올 때까지 Node를 Spin(대기) 시킵니다.
+        while rclpy.ok():
+            rclpy.spin_once(patrol_robot, timeout_sec=0.1)
+            
+            if patrol_robot.is_data_received:
+                # 데이터를 받으면 순찰 시작
+                patrol_robot.run_patrol()
+                break # 순찰이 끝나면 프로그램 종료 (계속 대기하려면 break 제거 및 플래그 초기화)
+                
+    except KeyboardInterrupt:
+        pass
+    finally:
+        patrol_robot.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
