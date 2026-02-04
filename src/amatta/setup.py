@@ -26,6 +26,8 @@ setup(
         'console_scripts': [
             'move = amatta.move_test:main',
             'move_brute = amatta.move_test_brute:main',
+            'visited = amatta.visited_history_patrol:main',
+            'lost = amatta.lost_spot_patrol:main',
         ],
     },
 )
