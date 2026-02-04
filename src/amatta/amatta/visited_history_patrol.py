@@ -30,12 +30,49 @@ class VisitedHistoryPatrol:
 
         # 4. 목표 지점(장소 DB) 정의
         self.goal_options = [
-            {'name': 'Gate_1',    'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
-            {'name': 'Duty_Free', 'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
-            {'name': 'Mens_Room', 'pose': self.create_pose(-3.23, 2.73, 0.7177, 0.6963)},
-            {'name': 'Counter',   'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)}
+            # 0 입구 (Entrance)
+            {'name': 'Entrance',
+            'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)},
+
+            # 1 은행 (Bank)
+            {'name': 'Bank',
+            'pose': self.create_pose(-2.39, 3.15, 0.4327, 0.9015)},
+
+            # 2 카운터 (Counter)
+            {'name': 'Counter',
+            'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)},
+
+            # 3 벤치1 (Bench 1)
+            {'name': 'Bench_1',
+            'pose': self.create_pose(-0.54, 2.12, -0.7689, 0.6394)},
+
+            # 4 벤치2 (Bench 2)
+            {'name': 'Bench_2',
+            'pose': self.create_pose(-0.83, 0.80, 0.58, 0.8146)},
+
+            # 5 여자화장실 (Ladies Room)
+            {'name': 'Ladies_Room',
+            'pose': self.create_pose(-0.486, -0.75, -0.1166, 0.9931)},
+
+            # 6 면세점 (Duty Free)
+            {'name': 'Duty_Free',
+            'pose': self.create_pose(-1.99, 0.82, -0.9927, 0.1203)},
+
+            # 7 남자화장실 (Mens Room)
+            {'name': 'Mens_Room',
+            'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
         ]
 
+        self.gate_options = [
+            # 0 Gate 1
+            {'name': 'Gate_1',
+            'pose': self.create_pose(-0.60, -1.31, -0.6276, 0.7785)},
+
+            # 1 Gate 2
+            {'name': 'Gate_2',
+            'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
+        ]
+        
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
         pose.header.frame_id = 'map'

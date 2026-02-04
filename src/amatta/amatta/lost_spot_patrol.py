@@ -36,45 +36,45 @@ class LostItemPatrol:
         self.goal_options = [
             # 0 입구 (Entrance)
             {'name': 'Entrance',
-             'pose': create_pose(navigator, -3.26, 3.77, 0.9881, 0.1536)},
+             'pose': self.create_pose(-3.26, 3.77, 0.9881, 0.1536)},
 
             # 1 은행 (Bank)
             {'name': 'Bank',
-             'pose': create_pose(navigator, -2.08, 3.45, 0.4327, 0.9015)},
+             'pose': self.create_pose(-2.08, 3.45, 0.4327, 0.9015)},
 
             # 2 카운터 (Counter)
             {'name': 'Counter',
-             'pose': create_pose(navigator, -0.584, 3.64, -0.7689, 0.6394)},
+             'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)},
 
             # 3 벤치1 (Bench 1)
             {'name': 'Bench_1',
-             'pose': create_pose(navigator, -0.791, 2.19, -0.7689, 0.6394)},
+             'pose': self.create_pose(-0.791, 2.19, -0.7689, 0.6394)},
 
             # 4 벤치2 (Bench 2)
             {'name': 'Bench_2',
-             'pose': create_pose(navigator, -0.672, 0.615, 0.58, 0.8146)},
+             'pose': self.create_pose(-0.672, 0.615, 0.58, 0.8146)},
 
             # 5 여자화장실 (Ladies Room)
             {'name': 'Ladies_Room',
-             'pose': create_pose(navigator, -0.547, -0.636, -0.1166, 0.9931)},
+             'pose': self.create_pose(-0.547, -0.636, -0.1166, 0.9931)},
 
             # 6 면세점 (Duty Free)
             {'name': 'Duty_Free',
-             'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)},
+             'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
 
             # 7 남자화장실 (Mens Room)
             {'name': 'Mens_Room',
-             'pose': create_pose(navigator, -3.16, 2.58, 0.7177, 0.6963)}
+             'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
         ]
 
         self.gate_options = [
             # 0번 인덱스: Gate 1
             {'name': 'Gate_1',
-             'pose': create_pose(navigator, -0.76, -1.59, 0.9881, 0.1536)},
+             'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
 
             # 1번 인덱스: Gate 2
             {'name': 'Gate_2',
-             'pose': create_pose(navigator, -2.18, -1.26, -0.7512, 0.66)},
+             'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
         ]
 
     def create_pose(self, x, y, z_orient, w_orient):

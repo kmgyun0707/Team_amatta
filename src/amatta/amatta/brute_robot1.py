@@ -1,5 +1,6 @@
 import rclpy
 import time
+import requests
 
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 from geometry_msgs.msg import PoseStamped
@@ -27,6 +28,22 @@ def main(args=None):
     rclpy.init(args=args)
 
     navigator = TurtleBot4Navigator()
+    all_spots = list(range(8))
+
+    # url오면 수정
+    flask_url = "http://127.0.0.1:5000/api/get_robot_mission"
+    try:
+        response = requests.get(flask_url, timeout=5)
+        if response.status_code == 200:
+            selected_spots = response.json()  # 예: [1, 5] (웹에서 선택한 곳)
+            
+            # 전체(0~7)에서 선택된 것만 제외하고 visited_spots 생성
+            visited_spots = [spot for spot in all_spots if spot not in selected_spots]
+            print(f"최종 순찰 경로(제외 완료): {visited_spots}")
+        else:
+            print("서버 응답 에러, 기본 주행을 수행합니다.")
+    except Exception as e:
+        print(f"서버 연결 실패: {e}")
 
     # Start on dock
     if not navigator.getDockedStatus():
@@ -44,50 +61,51 @@ def main(args=None):
     navigator.undock()
 
     
-    visited_spots = [0, 1, 2, 3]        # 추후 DB에서 읽어오도록 수정 필요
+    # visited_spots = [0, 1, 2, 3]        # 추후 DB에서 읽어오도록 수정 필요
 
     # Prepare goal pose options
     goal_options = [
+        # 0 입구 (Entrance)
         {'name': 'Entrance',
          'pose': create_pose(navigator, -3.26, 3.71, 0.9881, 0.1536)},
 
-        # 은행 (Bank)
-        # {'name': 'Bank',
-        #  'pose': create_pose(navigator, -1.91, 0.71, 0.4327, 0.9015)},
+        # 1 은행 (Bank)
         {'name': 'Bank',
          'pose': create_pose(navigator, -2.39, 3.15, 0.4327, 0.9015)},
 
-        # 카운터 (Counter)
+        # 2 카운터 (Counter)
         {'name': 'Counter',
          'pose': create_pose(navigator, -0.54, 3.64, 0.7177, 0.6963)},
 
-        # 벤치1 (Bench 1)
+        # 3 벤치1 (Bench 1)
         {'name': 'Bench_1',
          'pose': create_pose(navigator, -0.54, 2.12, -0.7689, 0.6394)},
 
-        # 벤치2 (Bench 2)
+        # 4 벤치2 (Bench 2)
         {'name': 'Bench_2',
          'pose': create_pose(navigator, -0.83, 0.80, 0.58, 0.8146)},
 
-        # 여자화장실 (Ladies Room)
+        # 5 여자화장실 (Ladies Room)
         {'name': 'Ladies_Room',
          'pose': create_pose(navigator, -0.486, -0.75, -0.1166, 0.9931)},
 
-        # Gate 1
-        {'name': 'Gate_1',
-         'pose': create_pose(navigator, -0.60, -1.31, -0.6276, 0.7785)},
-
-        # Gate 2
-        {'name': 'Gate_2',
-         'pose': create_pose(navigator, -2.13, -1.37, -0.7512, 0.66)},
-
-        # 면세점 (Duty Free)
+        # 6 면세점 (Duty Free)
         {'name': 'Duty_Free',
          'pose': create_pose(navigator, -1.99, 0.82, -0.9927, 0.1203)},
 
-        # 남자화장실 (Mens Room)
+        # 7 남자화장실 (Mens Room)
         {'name': 'Mens_Room',
          'pose': create_pose(navigator, -3.29, 2.6, 0.9980, 0.0631)}
+    ]
+
+    gate_options = [
+        # 0 Gate 1
+        {'name': 'Gate_1',
+         'pose': create_pose(navigator, -0.60, -1.31, -0.6276, 0.7785)},
+
+        # 1 Gate 2
+        {'name': 'Gate_2',
+         'pose': create_pose(navigator, -2.13, -1.37, -0.7512, 0.66)},
     ]
 
     navigator.info('Welcome to the mail delivery service.')
