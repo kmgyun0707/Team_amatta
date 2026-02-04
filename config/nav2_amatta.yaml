@@ -118,7 +118,7 @@ controller_server:
       vx_samples: 20
       vy_samples: 5
       vtheta_samples: 20
-      sim_time: 2.0 #1.7
+      sim_time: 1.7
       linear_granularity: 0.05
       angular_granularity: 0.025
       transform_tolerance: 0.2
@@ -126,21 +126,17 @@ controller_server:
       trans_stopped_velocity: 0.25
       short_circuit_trajectory_evaluation: True
       stateful: True
-      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist", "PreferForward"]
-      # 2.0 -> 2.5 전 벽 비비진않고 보다 잘감
-      BaseObstacle.scale: 4.0 #0.02
-      PathAlign.scale: 35.0 #10.0
-      PathAlign.forward_point_distance: 0.3 #0.1
-      GoalAlign.scale: 15.0 #24.0
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 2.0 #0.02
+      PathAlign.scale: 20.0 #10.0
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 20.0 #24.0
       GoalAlign.forward_point_distance: 0.1
-      PathDist.scale: 35.0 #32.0 
-      GoalDist.scale: 15.0 #24.0
-      RotateToGoal.scale: 8.0 #32.0
-      RotateToGoal.slowing_factor: 3.0 #5.0
+      PathDist.scale: 30.0 #32.0 
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0
+      RotateToGoal.slowing_factor: 5.0
       RotateToGoal.lookahead_time: -1.0
-
-      #추가
-      PreferForward.scale: 2.0
 
 local_costmap:
   local_costmap:
@@ -159,7 +155,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 6.0 #2.0
-        inflation_radius: 0.35 #0.45
+        inflation_radius: 0.25 #0.45
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -217,7 +213,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 6.0  # 4.0
-        inflation_radius: 0.35 #0.45
+        inflation_radius: 0.45 #0.45
       always_send_full_costmap: True
 
 planner_server:
