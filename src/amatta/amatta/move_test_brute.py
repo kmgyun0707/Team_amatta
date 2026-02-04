@@ -65,6 +65,7 @@ def find_best_route_brute_force(start_pose, spots_indices, goal_options):
     return best_order, min_distance
 
 def main(args=None):
+
     rclpy.init(args=args)
 
     navigator = TurtleBot4Navigator()
@@ -83,6 +84,26 @@ def main(args=None):
 
     # Undock
     navigator.undock()
+
+    # Prepare goal pose options: Rviz에서 맞는지 확인할 것
+    goal_options = [
+        # 0
+        {'name': 'Gate_1',
+         'pose': create_pose(navigator, -0.76, -1.59, 0.9881, 0.1536)},
+
+        # 1
+        {'name': 'Duty_Free',
+         'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)},
+
+        # 2 
+        {'name': 'Mens_Room',
+         'pose': create_pose(navigator, -3.23, 2.73, 0.7177, 0.6963)}, # 남자화장실 좌표 찍어야 함
+
+        # 3
+        {'name': 'Counter',
+         'pose': create_pose(navigator, -0.584, 3.64, -0.7689, 0.6394)}
+
+    ]
 
     
     visited_spots = []        # 추후 DB에서 읽어오도록 수정 필요
@@ -160,25 +181,7 @@ def main(args=None):
     #     {'name': 'Mens_Room',
     #      'pose': create_pose(navigator, -3.29, -0.10, 0.9980, 0.0631)}
     # ]
-    # Prepare goal pose options: Rviz에서 맞는지 확인할 것
-    goal_options = [
-        # 0
-        {'name': 'Gate_1',
-         'pose': create_pose(navigator, -0.76, -1.59, 0.9881, 0.1536)},
-
-        # 1
-        {'name': 'Duty_Free',
-         'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)},
-
-        # 2 
-        {'name': 'Mens_Room',
-         'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)}, # 남자화장실 좌표 찍어야 함
-
-        # 3
-        {'name': 'Counter',
-         'pose': create_pose(navigator, -0.584, 3.64, -0.7689, 0.6394)}
-
-    ]
+    
     navigator.info('Welcome to the mail delivery service.')
 
     best_route, total_dist = find_best_route_brute_force(initial_pose, visited_spots, goal_options)
@@ -188,7 +191,7 @@ def main(args=None):
     navigator.info(f'Best Route Found: {path_names}')
     # navigator.info(f'Estimated Total Distance: {total_dist:.2f} meters')
 
-    # visited_spots 순서대로 탐색
+    # best route 탐색
     for index in best_route:
         target_name = goal_options[index]['name']
         target_pose = goal_options[index]['pose']
