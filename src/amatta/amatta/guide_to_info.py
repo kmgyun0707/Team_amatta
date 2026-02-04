@@ -1,14 +1,9 @@
-# robot 1 구동하는 코드: 사용자가 입력한 이동 경로를 따라 탐색
+# robot 1 구동하는 코드: db에서 분실물 관련 토픽 구독해 보관소에 분실물 유무에 따른 가이드 모드 및 탐색 모드
 import rclpy
 from rclpy.node import Node
-
-import time
-import math
-import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
-from nav2_simple_commander.robot_navigator import TaskResult
-from std_msgs.msg import Int32MultiArray, Bool
+from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import Bool
 from airport_guide_interfaces.msg import DbInfo
 
 
@@ -18,12 +13,14 @@ class GuideToInfo(Node):
         self.navigator = TurtleBot4Navigator()
         self.registered = False
 
+        # 토픽으로 탐색 모드 여부(True = 탐색모드 시작) 발행
         self.publisher = self.create_publisher(
             Bool,
             '/search_mode',
             10
         )
 
+        # db에서 DbInfo 타입의 분실물의 유무 토픽 구독
         self.subscription = self.create_subscription(
             DbInfo,
             '/is_registered',
@@ -34,9 +31,9 @@ class GuideToInfo(Node):
         self.timer = self.create_timer(0.5, self.timer_callback)
 
 
-        # 4. 목표 지점(장소 DB) 정의
+        # 4. 목표 지점 정의
         self.target_pose = [
-            # 0 입구 (Entrance)
+            # 분실물 보관소 좌표
             {'name': 'Entrance',
             'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)}
         ]
@@ -61,13 +58,13 @@ class GuideToInfo(Node):
             msg.data = True
         
         self.publisher.publish(msg)
-        # self.get_logger().info(f'Publishing search_mode: {msg.data}')
 
+    
     def db_callback(self, msg):
         self.registered = msg.registered
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
-            self.navigator.startToPose(target_pose)
+            self.navigator.startToPose(self.target_pose)
 
 
         
