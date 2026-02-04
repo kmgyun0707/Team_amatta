@@ -105,8 +105,52 @@ def main(args=None):
 
     ]
 
+    # Prepare goal pose options
+    # goal_options = [
+    #     # 0 입구 (Entrance)
+    #     {'name': 'Entrance',
+    #      'pose': create_pose(navigator, -3.26, 0.95, 0.9881, 0.1536)},
+
+    #     # 1 은행 (Bank)
+    #     {'name': 'Bank',
+    #      'pose': create_pose(navigator, -1.91, 0.71, 0.4327, 0.9015)},
+
+    #     # 2 카운터 (Counter)
+    #     {'name': 'Counter',
+    #      'pose': create_pose(navigator, -0.584, 3.64, -0.7689, 0.6394)},
+
+    #     # 3 벤치1 (Bench 1)
+    #     {'name': 'Bench_1',
+    #      'pose': create_pose(navigator, -0.54, -0.87, -0.7689, 0.6394)},
+
+    #     # 4 벤치2 (Bench 2)
+    #     {'name': 'Bench_2',
+    #      'pose': create_pose(navigator, -0.83, -2.24, 0.58, 0.8146)},
+
+    #     # 5 여자화장실 (Ladies Room)
+    #     {'name': 'Ladies_Room',
+    #      'pose': create_pose(navigator, -0.47, -3.87, -0.1166, 0.9931)},
+
+    #     # 6 Gate 1
+    #     {'name': 'Gate_1',
+    #      'pose': create_pose(navigator, -0.76, -1.59, 0.9881, 0.1536)},
+
+    #     # 7 Gate 2
+    #     {'name': 'Gate_2',
+    #      'pose': create_pose(navigator, -2.10, -4.16, -0.7512, 0.66)},
+
+    #     # 8 면세점 (Duty Free)
+    #     {'name': 'Duty_Free',
+    #      'pose': create_pose(navigator, -2.35, 0.799, 0.7177, 0.6963)},
+
+    #     # 9 남자화장실 (Mens Room)
+    #     {'name': 'Mens_Room',
+    #      'pose': create_pose(navigator, -3.23, 2.73, 0.7177, 0.6963)}
+    # ]
+
     
     visited_spots = []        # 추후 DB에서 읽어오도록 수정 필요
+    all_indices = list(range(len(goal_options)))
 
     while True:
         try:
@@ -126,7 +170,7 @@ def main(args=None):
                 print(f"오류: 존재하지 않는 인덱스가 포함되어 있습니다: {invalid_indices}")
                 continue
             
-            visited_spots = input_indices
+            visited_spots = [idx for idx in all_indices if idx not in input_indices]
             break
 
         except ValueError:
@@ -139,48 +183,7 @@ def main(args=None):
         navigator.info("No targets selected. Exiting.")
         return
 
-    # Prepare goal pose options
-    # goal_options = [
-    #     # 0 입구 (Entrance)
-    #     {'name': 'Entrance',
-    #      'pose': create_pose(navigator, -3.26, 0.95, 0.9881, 0.1536)},
-
-    #     # 1 은행 (Bank)
-    #     {'name': 'Bank',
-    #      'pose': create_pose(navigator, -1.91, 0.71, 0.4327, 0.9015)},
-
-    #     # 2 카운터 (Counter)
-    #     {'name': 'Counter',
-    #      'pose': create_pose(navigator, -0.54, 0.77, 0.7177, 0.6963)},
-
-    #     # 3 벤치1 (Bench 1)
-    #     {'name': 'Bench_1',
-    #      'pose': create_pose(navigator, -0.54, -0.87, -0.7689, 0.6394)},
-
-    #     # 4 벤치2 (Bench 2)
-    #     {'name': 'Bench_2',
-    #      'pose': create_pose(navigator, -0.83, -2.24, 0.58, 0.8146)},
-
-    #     # 5 여자화장실 (Ladies Room)
-    #     {'name': 'Ladies_Room',
-    #      'pose': create_pose(navigator, -0.47, -3.87, -0.1166, 0.9931)},
-
-    #     # 6 Gate 1
-    #     {'name': 'Gate_1',
-    #      'pose': create_pose(navigator, -0.76, -4.44, -0.6276, 0.7785)},
-
-    #     # 7 Gate 2
-    #     {'name': 'Gate_2',
-    #      'pose': create_pose(navigator, -2.10, -4.16, -0.7512, 0.66)},
-
-    #     # 8 면세점 (Duty Free)
-    #     {'name': 'Duty_Free',
-    #      'pose': create_pose(navigator, -2.22, -1.98, -0.9927, 0.1203)},
-
-    #     # 9 남자화장실 (Mens Room)
-    #     {'name': 'Mens_Room',
-    #      'pose': create_pose(navigator, -3.29, -0.10, 0.9980, 0.0631)}
-    # ]
+    
     
     navigator.info('Welcome to the mail delivery service.')
 

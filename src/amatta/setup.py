@@ -14,9 +14,9 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='rokey',
-    maintainer_email='kmj564@sookmyung.ac.kr',
+    maintainer_email='lee74785764@gmail.com',
     description='TODO: Package description',
-    license='Apache-2.0',
+    license='TODO: License declaration',
     extras_require={
         'test': [
             'pytest',
@@ -24,7 +24,8 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'move_brute = amatta.move_test_brute:main'
+            'move = amatta.move_test:main',
+            'move_brute = amatta.move_test_brute:main',
         ],
     },
 )
