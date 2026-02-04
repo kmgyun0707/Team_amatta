@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>안내 시작</title>
+  <title>탐색 시작</title>
   <style>
     body { font-family: sans-serif; background:#f6f7fb; margin:0; }
     .wrap {
@@ -14,10 +14,9 @@
       box-shadow: 0 6px 18px rgba(0,0,0,0.08);
       text-align: center;
     }
-    .msg { font-size: 18px; font-weight: 700; margin: 10px 0 6px; }
-    .sub { font-size: 13px; color: #666; margin-top: 8px; }
-    .ok { color: #0a7a2f; font-weight: 700; margin-top: 12px; }
-    .bad { color: #b00020; font-weight: 700; margin-top: 12px; }
+    .msg { font-size: 18px; font-weight: 800; margin: 8px 0; }
+    .sub { font-size: 13px; color:#666; margin-top: 8px; }
+    .idbox { margin-top: 14px; font-size: 13px; color:#333; background:#f2f2f2; padding:10px; border-radius:12px; }
     .btn {
       width: 100%;
       margin-top: 18px;
@@ -33,14 +32,15 @@
 </head>
 <body>
   <div class="wrap">
-    <div class="msg">분실물 보관함으로 안내를 시작합니다</div>
-    <div class="sub">로봇에게 위치 정보를 전송했습니다. 로봇이 이동을 시작합니다.</div>
+    <div class="msg">분실물 탐색을 시작합니다</div>
+    <div class="sub">로봇이 방문 경로를 따라 이동하며 분실물을 탐색합니다.</div>
 
-    <div class="ok">전송 완료!</div>
+    <div class="idbox">
+      신고 ID: {{ lost_id if lost_id else "N/A" }}
+    </div>
 
-    <button class="btn" onclick="location.href='/user_load'">목록으로 돌아가기</button>
+    <button class="btn" onclick="location.href='/'">목록으로 돌아가기</button>
     <button class="btn btn2" onclick="history.back()">이전으로</button>
   </div>
 </body>
-
 </html>

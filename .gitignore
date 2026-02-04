@@ -1,0 +1,30 @@
+# ===== Build / Install =====
+build/
+install/
+log/
+
+# ===== Cache =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.cache/
+
+# ===== VS Code =====
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# ===== ROS bag =====
+*.db3
+*.bag
+*.bag_*
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db

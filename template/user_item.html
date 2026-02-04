@@ -15,12 +15,12 @@
 </head>
 <body>
     <div class="container">
-        <h2>무엇을 잃어버리셨나요?</h2>
+        <h2>AMATTA</h2>
         
         <div class="filter-section">
             <select id="category" onchange="loadItems()">
                 <option value="전체">종류 (전체)</option>
-                <option value="지갑, 카드지갑">지갑</option>
+                <option value="지갑">지갑</option>
                 <option value="블루투스 이어폰">이어폰</option>
                 <option value="가방">가방</option>
                 <option value="스마트폰">스마트폰</option>
@@ -64,7 +64,7 @@
                         list.innerHTML += `
                             <div class="item-card">
                                 <div class="image-box"
-                                    onclick="location.href='/guide_start?item_id=${item.id}'">
+                                    onclick="location.href='/guide_start?item_id=${item.id}&counter=0'">
                                 </div>
                                 <div>장소: ${item.location_x}, ${item.location_y}</div>
                                 <div>시간: ${item.time}</div>
