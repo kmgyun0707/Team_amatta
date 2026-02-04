@@ -8,6 +8,7 @@ from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, Tur
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_simple_commander.robot_navigator import TaskResult
 from std_msgs.msg import Int32MultiArray
+from geometry_msgs.msg import Twist
 
 class LostItemPatrol(Node):
     def __init__(self):
@@ -28,6 +29,11 @@ class LostItemPatrol(Node):
 
         self.robot1_pose = None
         self.robot2_pose = None
+
+        self.cmd_vel_pub = self.navigator.create_publisher(
+            Twist,
+            '/robot3/cmd_vel',  # 또는 '/cmd_vel'
+            10)
 
         self.robot2_sub = self.create_subscription(
             PoseWithCovarianceStamped,
@@ -120,12 +126,14 @@ class LostItemPatrol(Node):
     def is_robot1_nearby(self, threshold=1.0):
         """로봇 1이 threshold(미터) 이내에 있는지 확인"""
         if self.robot1_pose is None or self.robot2_pose is None:
+            self.get_logger().error(f'로봇 위치 못 받아옴')
             return False
 
         dist = math.sqrt(
             (self.robot1_pose.position.x - self.robot2_pose.position.x)**2 +
             (self.robot1_pose.position.y - self.robot2_pose.position.y)**2
         )
+        self.get_logger().info(f'dist: {dist}, dist<threshold: {dist < threshold}')
         return dist < threshold
 
     def create_pose(self, x, y, z_orient, w_orient):
@@ -182,39 +190,20 @@ class LostItemPatrol(Node):
                 
         return best_order, min_distance
 
-    # def get_user_input(self):
-    #     """사용자 입력을 받아 제외할 곳을 뺀 방문 리스트를 반환"""
-    #     all_indices = list(range(len(self.goal_options)))
+    def stop_robot(self):
+        """로봇 즉시 정지"""
+        stop_msg = Twist()
+        stop_msg.linear.x = 0.0
+        stop_msg.linear.y = 0.0
+        stop_msg.linear.z = 0.0
+        stop_msg.angular.x = 0.0
+        stop_msg.angular.y = 0.0
+        stop_msg.angular.z = 0.0
         
-    #     print("\n" + "="*40)
-    #     print("      [ 전체 장소 목록 ]")
-    #     for i, option in enumerate(self.goal_options):
-    #         print(f"  {i} : {option['name']}")
-    #     print("="*40)
-
-    #     while True:
-    #         try:
-    #             user_input = input("\n탐색에서 제외할 장소의 번호를 공백으로 구분해 입력하세요 (엔터 시 전체 탐색): ")
-                
-    #             # 입력이 없으면 전체 방문
-    #             if not user_input.strip():
-    #                 print("제외할 장소가 없습니다. 모든 장소를 탐색합니다.")
-    #                 return all_indices
-
-    #             input_indices = list(set(map(int, user_input.split())))
-
-    #             # 유효성 검사
-    #             invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
-    #             if invalid_indices:
-    #                 print(f"오류: 존재하지 않는 인덱스입니다: {invalid_indices}")
-    #                 continue
-                
-    #             # 차집합 계산 (전체 - 제외)
-    #             visited_spots = [idx for idx in all_indices if idx not in input_indices]
-    #             return visited_spots
-
-    #         except ValueError:
-    #             print("오류: 숫자만 입력해주세요.")
+        # 여러 번 publish (확실하게)
+        for _ in range(10):
+            self.cmd_vel_pub.publish(stop_msg)
+            time.sleep(0.01)
 
     def run_patrol(self):
         # 1. 방문할 장소 결정
@@ -253,10 +242,14 @@ class LostItemPatrol(Node):
             self.navigator.startToPose(target_pose)
 
             while not self.navigator.isTaskComplete():
-                if self.is_robot1_nearby(1.2):
+                if self.is_robot1_nearby(2):
                     self.navigator.info("Robot 3 approaching! Yielding...")
+                    self.stop_robot()
                     self.navigator.cancelTask()
-                    while self.is_robot1_nearby(1.5):
+
+                    while self.is_robot1_nearby(2):
+                        self.navigator.info("Robot 3 approaching! Yielding...")
+                        self.stop_robot()
                         time.sleep(1.0)
                     self.navigator.startToPose(target_pose)
                 time.sleep(0.1)
