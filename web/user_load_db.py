@@ -13,21 +13,16 @@ def get_db():
     conn.row_factory = sqlite3.Row    # 조회결과를 딕셔너리 형태로 설정
     return conn
 
-@user_load_db_bp.route("/user_load")  #url이 /user_load의 경로로 들어오면 아래 함수가 실행됨
-
-#위 라우트의 핸들러 함수
+@user_load_db_bp.route("/")         #url로 들어오면 아래 함수가 실행됨
 def index():
-    if 'username' not in session:                         # 로그인 확인 코드
-        flash('로그인이 필요합니다.', 'warning')
-        return redirect(url_for('user_login.user_login')) # 로그인 실패 시 로그인 화면으로 redirect
-    return render_template('user_item.html')              # 로그인 성공 시 user_item.html 렌더링
+    return render_template('user_item.html')              # user_item.html 렌더링
 
 @user_load_db_bp.route("/filter", methods=["GET"])
 def filter_items():
     category = request.args.get('category')               # DB에 있는 데이터 중 category, color에 해당하는 값 읽음
     color = request.args.get('color')                     
     
-    conn = get_db()                            # DB연결 함수 변수에 저장
+    conn = get_db()                                        # DB연결 함수 변수에 저장
     query = "SELECT * FROM item WHERE state = '보관중'"     # item 테이블에서 state가 '보관중'인 데이터만 조회
     params = []
     

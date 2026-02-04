@@ -8,9 +8,9 @@ guide_start_bp = Blueprint("guide_start", __name__)
 
 DB_PATH = "/home/rokey/Desktop/amatta/sql/amatta.db"
 
-LOST_AND_FOUND_POSE = {"frame": "map", "x": 1.20, "y": -0.80, "yaw": 0.0}  #분실문 보관소의 고정 좌표(추후 수정)
-TOPIC_NAME = "/lost_and_found_goal"  # 토픽 이름(추후 수정)
-MSG_TYPE = "std_msgs/msg/String"     # 토픽 메시지 타입(추후 수정)
+LOST_AND_FOUND_POSE = {"frame": "map", "x": 1.20, "y": -0.80, "yaw": 0.0}
+TOPIC_NAME = "/is_registered"       # 토픽 이름(추후 수정)
+MSG_TYPE = "std_msgs/msg/String"    # 토픽 메시지 타입(추후 수정)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
