@@ -33,7 +33,7 @@ class VisitedHistoryPatrol(Node):
 
         self.subscription_pose = self.create_subscription(
             PoseWithCovarianceStamped,
-            '/robot3/amcl_pose',
+            '/robot1/amcl_pose',
             self.pose_callback,
             10
         )
@@ -91,7 +91,7 @@ class VisitedHistoryPatrol(Node):
             self.navigator.dock()
 
         # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)
         self.navigator.setInitialPose(initial_pose)
 
         # 3. Nav2 활성화 대기 및 Undock
@@ -251,10 +251,6 @@ def main(args=None):
     finally:
         tracer.destroy_node()
         rclpy.shutdown()
-
-    
-    
-    rclpy.shutdown()
 
 if __name__ == '__main__':
     main()
