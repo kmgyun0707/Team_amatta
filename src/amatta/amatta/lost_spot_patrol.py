@@ -26,12 +26,21 @@ class LostItemPatrol(Node):
             10
         )
 
-        self.subscription_pose = self.create_subscription(
+        self.robot1_pose = None
+        self.robot2_pose = None
+
+        self.robot2_sub = self.create_subscription(
             PoseWithCovarianceStamped,
             '/robot3/amcl_pose',
             self.pose_callback,
             10
         )
+        self.robot1_sub = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/robot1/amcl_pose',  # 로봇 1의 실시간 위치 토픽
+            self.robot1_pose_callback,
+            10)
+        
 
         # 목표 지점 정의 (robot 3 좌표 기준)
         self.goal_options = [
@@ -96,12 +105,28 @@ class LostItemPatrol(Node):
         self.visited_spot_raw = list(msg.data)
         self.is_data_received = True
 
+    def robot1_pose_callback(self, msg):
+        self.robot1_pose = msg.pose.pose
+    
     def pose_callback(self, msg):
         # AMCL은 PoseWithCovarianceStamped를 주지만, 
         # 우리가 필요한 건 PoseStamped이므로 변환해서 저장합니다.
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
+
+        self.robot2_pose = msg.pose.pose
+    
+    def is_robot1_nearby(self, threshold=1.0):
+        """로봇 1이 threshold(미터) 이내에 있는지 확인"""
+        if self.robot1_pose is None or self.robot2_pose is None:
+            return False
+
+        dist = math.sqrt(
+            (self.robot1_pose.position.x - self.robot2_pose.position.x)**2 +
+            (self.robot1_pose.position.y - self.robot2_pose.position.y)**2
+        )
+        return dist < threshold
 
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
@@ -220,10 +245,20 @@ class LostItemPatrol(Node):
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
 
+            while self.is_robot1_nearby(1.5): # 1.5미터 이내면 대기
+                self.navigator.info("Robot 1 is too close! Waiting...")
+                time.sleep(2.0)
+
             self.navigator.info(f'Navigating to {target_name}...')
             self.navigator.startToPose(target_pose)
 
             while not self.navigator.isTaskComplete():
+                if self.is_robot1_nearby(1.2):
+                    self.navigator.info("Robot 3 approaching! Yielding...")
+                    self.navigator.cancelTask()
+                    while self.is_robot1_nearby(1.5):
+                        time.sleep(1.0)
+                    self.navigator.startToPose(target_pose)
                 time.sleep(0.1)
 
             result = self.navigator.getResult()
