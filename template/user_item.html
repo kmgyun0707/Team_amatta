@@ -54,27 +54,32 @@
             const category = document.getElementById('category').value;
             const color = document.getElementById('color').value;
 
-            fetch(`/filter?category=${category}&color=${color}`)
-                .then(response => response.json())
-                .then(data => {
-                    const list = document.getElementById('item-list');
-                    list.innerHTML = ''; // 기존 목록 초기화
-                    
-                    data.forEach(item => {
-                        list.innerHTML += `
-                            <div class="item-card">
-                                <div class="image-box"
-                                    onclick="location.href='/guide_start?item_id=${item.id}&counter=0'">
-                                </div>
-                                <div>장소: ${item.location_x}, ${item.location_y}</div>
-                                <div>시간: ${item.time}</div>
-                            </div>
-                        `;
-                    });
+            fetch(`/filter?category=${encodeURIComponent(category)}&color=${encodeURIComponent(color)}`)
+            .then(r => r.json())
+            .then(data => {
+                const list = document.getElementById('item-list');
+                list.innerHTML = '';
+
+                data.forEach(item => {
+                const imgSrc = item.image_path ? encodeURI(item.image_path) : "/static/신짱구.png";
+
+                list.innerHTML += `
+                    <div class="item-card">
+                    <div class="image-box"
+                        onclick="location.href='/guide_start?item_id=${item.id}&counter=2'">
+                        <img src="${imgSrc}"
+                            alt="분실물 이미지"
+                            style="width:100%; height:100%; object-fit:cover; border-radius:10px;"
+                            onerror="this.src='/static/신짱구.png';">
+                    </div>
+                    <div>장소: ${item.location_x ?? ''}, ${item.location_y ?? ''}</div>
+                    <div>시간: ${item.time ?? ''}</div>
+                    </div>
+                `;
                 });
+            });
         }
-        // 페이지 로드 시 처음 한 번 실행
         window.onload = loadItems;
-    </script>
+        </script>
 </body>
 </html>

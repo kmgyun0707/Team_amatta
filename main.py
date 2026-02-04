@@ -1,4 +1,5 @@
 # main.py
+import os
 from flask import Flask, request, jsonify
 from web.ad_login import ad_login_bp
 from web.ad_load_db import ad_load_db_bp
@@ -9,13 +10,16 @@ from web.lost_report import lost_report_bp
 from web.guide_start import guide_start_bp
 from web.search_start import search_start_bp 
 
+
+BASE_DIR = "/home/rokey/Desktop/amatta"   # 너 프로젝트 루트
+
 def create_app():
     app = Flask(
         __name__,
         template_folder="/home/rokey/Desktop/amatta/template",
-        static_folder=None,
+        static_folder="/home/rokey/Desktop/amatta/static",
+        static_url_path="/static"
     )
-
     app.secret_key = "amatta"   # data 보호, 쿠키 수정 불가
 
     #app.register_blueprint(user_login_bp) # qr찍자마자 load_db 보이기

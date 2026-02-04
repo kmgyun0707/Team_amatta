@@ -11,9 +11,9 @@ VALUES
 ('최지수', '010-7777-8888', '태블릿', '스페이스그레이', 2, '분실'),
 ('정무명', '010-0000-0000', '장우산', '투명', 1, '분실');
 -- 다양한 아이템 데이터 입력
-INSERT INTO item (category, color, location_x, location_y, state)
+INSERT INTO item (category, color, location_x, location_y, image_path,state)
 VALUES
-('지갑', '검정색', 37.5665, 126.9780, '분실'),
+('지갑', '검정색', 37.5665, 126.9780, '/home/rokey/Desktop/amatta/yolo_img', '분실');
 ('스마트폰', '실버', 37.4979, 127.0276, '보관중'),
 ('에어팟', '화이트', 37.5123, 127.1025, '분실'),
 ('가방', '네이비', 37.5511, 126.9363, '보관중'),
