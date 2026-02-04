@@ -49,7 +49,9 @@ class GuideToInfo(Node):
         self.navigator.setInitialPose(initial_pose)
 
         # 3. Nav2 활성화 대기 및 Undock
+        self.navigator.info('Before Nav')
         self.navigator.waitUntilNav2Active()
+        self.navigator.info('After Nav')
         self.navigator.undock()
 
     def timer_callback(self):

@@ -29,6 +29,8 @@ setup(
             'visited = amatta.visited_history_patrol:main',
             'lost = amatta.lost_spot_patrol:main',
             'test_pub = amatta.test_pub:main',
+            'test_yolo = amatta.test_pub_yolo:main',
+            'test_db = amatta.test_pub_db:main',
             'guide = amatta.guide_to_info:main',
         ],
     },
