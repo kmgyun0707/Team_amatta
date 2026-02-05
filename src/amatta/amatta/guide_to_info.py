@@ -19,7 +19,7 @@ class GuideToInfo(Node):
     def __init__(self):
         super().__init__('guide_to_info')
         self.navigator = TurtleBot4Navigator()
-        self.registered = True
+        self.registered = None
         self.handle_registration = False
 
         # 토픽으로 탐색 모드 여부(True = 탐색모드 시작) 발행
@@ -43,8 +43,8 @@ class GuideToInfo(Node):
         # 4. 목표 지점 정의
         self.target_pose = [
             # 분실물 보관소 좌표
-            {'name': 'Entrance',
-            'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)}
+            {'name': 'Counter',
+            'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)}
         ]
 
         ################ 테스트 완료 후 setInitialPose만 남기기 ###############
@@ -64,19 +64,27 @@ class GuideToInfo(Node):
         self.navigator.undock()
 
     def timer_callback(self):       # DB의 분실물 여부 퍼블리시
-        msg = Bool()
-        if not self.registered:
-            msg.data = True
-        else:
-            msg.data = False
+        # msg = Bool()
+        # if not self.registered:
+        #     msg.data = True
+        # else:
+        #     msg.data = False
         
+        # self.publisher.publish(msg)
+        if self.registered is None:
+            return 
+
+        msg = Bool()
+        msg.data = not self.registered
         self.publisher.publish(msg)
 
     
     def db_callback(self, msg):
+        self.get_logger().info("db in*************")
         if self.handle_registration:
             return
         self.registered = msg.registered
+        self.get_logger().info(f"registered :{self.registered}")
         # 분실물이 있으면 분실물 보관소로 이동
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
