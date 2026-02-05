@@ -15,7 +15,7 @@ class ResultListener(Node):
         self.get_logger().info(f"✅ Listening: {TOPIC_NAME}")
 
     def cb(self, msg: SearchResult):
-        lost_id = int(msg.lost_id)
+        item_id = int(msg.item_id)
         found = bool(msg.found)
 
         new_state = "회수" if found else "분실"
@@ -24,13 +24,13 @@ class ResultListener(Node):
             conn = sqlite3.connect(DB_PATH)
             cur = conn.execute(
                 "UPDATE item_lost SET state = ? WHERE id = ? AND state = '탐색중'",
-                (new_state, lost_id),
+                (new_state, item_id),
             )
             conn.commit()
             conn.close()
 
             self.get_logger().info(
-                f"✅ lost_id={lost_id} found={found} => state='{new_state}' (updated rows={cur.rowcount})"
+                f"✅ lost_id={item_id} found={found} => state='{new_state}' (updated rows={cur.rowcount})"
             )
         except Exception as e:
             self.get_logger().error(f"DB update failed: {repr(e)}")

@@ -1,2 +1,2 @@
-int32 lost_id
+int32 item_id
 bool found

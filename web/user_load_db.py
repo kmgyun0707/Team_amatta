@@ -69,6 +69,9 @@ def filter_items():
     category = request.args.get('category')
     color = request.args.get('color')
 
+    category_etc = (request.args.get("category_etc") or "").strip()
+    color_etc = (request.args.get("color_etc") or "").strip()
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -83,14 +86,24 @@ def filter_items():
     params = []
 
     # 카테고리 필터가 "전체"가 아니면 조건 추가
-    if category != '전체':
+    if category == "기타":
+        # 기타인데 입력이 비어있으면 => 전체(필터 적용 X)
+        if category_etc:
+            query += " AND category LIKE ?"
+            params.append(f"%{category_etc}%")
+    elif category != "전체":
         keys = CATEGORY_MAP.get(category, [category])
-
         query += " AND (" + " OR ".join(["category LIKE ?"] * len(keys)) + ")"
         params.extend([f"%{k}%" for k in keys])
 
     # 색상 필터가 "전체"가 아니면 조건 추가
-    if color != '전체':
+    if color == "기타":
+        # 기타인데 입력이 비어있으면 => 전체
+        if color_etc:
+            # exact 매칭이 아니라 입력 검색이므로 LIKE 추천
+            query += " AND color LIKE ?"
+            params.append(f"%{color_etc}%")
+    elif color != "전체":
         query += " AND color = ?"
         params.append(color)
 
