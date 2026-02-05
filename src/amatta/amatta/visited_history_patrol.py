@@ -30,7 +30,8 @@ class VisitedHistoryPatrol(Node):
         self.is_data_received = False   # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
         self.is_detected = False        # 분실물을 인지했는지 여부
-
+        self.current_pose = None
+        
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
@@ -110,20 +111,6 @@ class VisitedHistoryPatrol(Node):
             {'name': 'Gate_2',
             'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
         ]
-
-
-        # 1. 초기화 및 Docking 상태 확인
-        if not self.navigator.getDockedStatus():
-            self.navigator.info('Docking before initialising pose')
-            self.navigator.dock()
-
-        # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)
-        self.navigator.setInitialPose(initial_pose)
-
-        # 3. Nav2 활성화 대기 및 Undock
-        self.navigator.waitUntilNav2Active()
-        self.navigator.undock()
 
     # 가이드 노드로부터 탐색 모드인지 서브스크라이브
     def search_mode_callback(self, msg):

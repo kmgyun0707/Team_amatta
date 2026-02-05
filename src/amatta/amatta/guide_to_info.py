@@ -8,6 +8,7 @@ from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
 from nav2_simple_commander.robot_navigator import TaskResult
 from airport_guide_interfaces.msg import DbInfo
+from rclpy.executors import ExternalShutdownException
 
 # INPUTS (topics):
 # - /is_registered (airport_guide_interfaces/DbInfo): DB 등록 결과 수신. True면 가이딩 모드 시작, False면 탐색 모드 시작
@@ -18,7 +19,8 @@ class GuideToInfo(Node):
     def __init__(self):
         super().__init__('guide_to_info')
         self.navigator = TurtleBot4Navigator()
-        self.registered = False
+        self.registered = True
+        self.handle_registration = False
 
         # 토픽으로 탐색 모드 여부(True = 탐색모드 시작) 발행
         self.publisher = self.create_publisher(
@@ -72,18 +74,22 @@ class GuideToInfo(Node):
 
     
     def db_callback(self, msg):
+        if self.handle_registration:
+            return
         self.registered = msg.registered
         # 분실물이 있으면 분실물 보관소로 이동
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
-
+            self.handle_registration = True
             self.navigator.startToPose(self.target_pose[0]['pose'])
             while not self.navigator.isTaskComplete():
+                if not rclpy.ok(): 
+                    return
                 time.sleep(0.1)
             result = self.navigator.getResult()# 이 경우에만 코드 종료되도록 수정 필요
             if result == TaskResult.SUCCEEDED:      
                 self.navigator.info(f'Arrived at entrance!')
-                time.sleep(2.0)
+                rclpy.shutdown()
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to entrance was canceled.')
             elif result == TaskResult.FAILED:
@@ -113,12 +119,12 @@ def main(args=None):
         while rclpy.ok():
             rclpy.spin(guide)
             
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
         
-    finally:
-        guide.destroy_node()
-        rclpy.shutdown()
+    if rclpy.ok():
+            guide.destroy_node()
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':
