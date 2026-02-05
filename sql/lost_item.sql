@@ -5,7 +5,6 @@ CREATE TABLE item(
     time datetime not null default current_timestamp,
     location_x REAL not NULL,
     location_y REAL not NULL,
-    image BLOB,
     image_path TEXT,
     state TEXT not null DEFAULT '보관중'
 );

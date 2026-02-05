@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>분실물 찾기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
 
   <style>
     :root{
@@ -38,9 +39,11 @@
     }
 
     .title{
-      font-size:20px;
-      font-weight:900;
-      margin:6px 0 4px;
+      font-family: 'Baloo 2', cursive;
+      font-size: 34px;
+      font-weight: 800;
+      text-align: center;
+      margin: 10px 0 6px;
     }
 
     .sub{
@@ -138,6 +141,24 @@
     }
 
     .btn:hover{ opacity:0.95; }
+
+    .admin-btn{
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-radius: 10px;
+      border: none;
+      background: #e5e7eb;
+      color: #374151;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .admin-btn:hover{
+      background:#d1d5db;
+    }
   </style>
 </head>
 
@@ -249,5 +270,10 @@
         document.getElementById("color_etc").addEventListener("input", loadItems);
     });
   </script>
+  <div class="actions" style="margin-top:10px;">
+        <button class="admin-btn" onclick="location.href='/ad_login'">
+          관리자
+        </button>
+  </div>
 </body>
 </html>

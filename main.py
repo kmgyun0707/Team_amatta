@@ -1,5 +1,5 @@
 # main.py
-import os
+import threading
 from flask import Flask, request, jsonify
 from web.ad_login import ad_login_bp
 from web.ad_load_db import ad_load_db_bp
@@ -9,6 +9,7 @@ from web.user_load_db import user_load_db_bp
 from web.lost_report import lost_report_bp
 from web.guide_start import guide_start_bp
 from web.search_start import search_start_bp 
+from web.found_item_listener import start_found_item_listener
 
 
 BASE_DIR = "/home/rokey/Desktop/amatta"   # 너 프로젝트 루트
@@ -37,4 +38,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
+    threading.Thread(target=start_found_item_listener, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)  # 5000port에서 열림

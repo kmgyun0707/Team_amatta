@@ -26,6 +26,17 @@ CATEGORY_MAP = {
     "가방": ["가방", "백팩", "백", "배낭", "bag", "backpack", "핸드백", "쇼핑백"],
     "여권": ["여권", "여권케이스"]
 }
+COLOR_MAP = {
+    "빨강색": ["빨강색", "빨강", "레드", "red"],
+    "주황색": ["주황색", "주황", "오렌지", "orange"],
+    "노란색": ["노란색", "노랑색", "노랑", "옐로우", "yellow"],
+    "초록색": ["초록색", "초록","녹색", "그린", "green"],
+    "파랑색": ["파랑색", "파란색", "파랑", "블루", "blue"],
+    "남색": ["남색", "군청색", "네이비", "navy"],
+    "검정색": ["검정색", "검정", "블랙", "black"],
+    "흰색": ["흰색", "하양색", "하양", "백색", "화이트", "white"],
+    "투명": ["투명", "무색", "클리어", "clear"]
+}
 
 # 데이터베이스(DB)에 연결하는 함수
 # 이 함수를 호출하면 DB와 연결된 통로(conn)를 돌려준다.
@@ -98,14 +109,13 @@ def filter_items():
 
     # 색상 필터가 "전체"가 아니면 조건 추가
     if color == "기타":
-        # 기타인데 입력이 비어있으면 => 전체
         if color_etc:
-            # exact 매칭이 아니라 입력 검색이므로 LIKE 추천
             query += " AND color LIKE ?"
             params.append(f"%{color_etc}%")
     elif color != "전체":
-        query += " AND color = ?"
-        params.append(color)
+        keys = COLOR_MAP.get(color, [color])
+        query += " AND (" + " OR ".join(["color LIKE ?"] * len(keys)) + ")"
+        params.extend([f"%{k}%" for k in keys])
 
     # 완성된 쿼리 실행
     cur.execute(query, params)
