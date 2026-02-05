@@ -26,11 +26,11 @@ class LostItemPatrol(Node):
         super().__init__('lost_item_patrol')
         self.navigator = TurtleBot4Navigator()
 
-        # 토픽 수신 여부와 데이터를 저장할 변수
-        self.visited_spot = []
-        self.is_data_received = False
-        self.search_mode = False
-        self.is_detected = False
+        # 토픽 수신 여부와 데이터를 저장할 변수 초기화
+        self.visited_spot = []          # 이동할 경로 리스트
+        self.is_data_received = False   # db로부터 토픽을 수신했는지 여부
+        self.search_mode = False        # 탐색 모드 여부
+        self.is_detected = False        # 분실물을 인지했는지 여부
 
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
@@ -56,7 +56,7 @@ class LostItemPatrol(Node):
             '/robot3/cmd_vel',
             10)
 
-        # 로봇 1,2의 현재 위치 각각 구독
+        # 로봇 1,2의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
         self.robot1_sub = self.create_subscription(
             PoseWithCovarianceStamped,
             '/robot1/amcl_pose',
@@ -142,7 +142,7 @@ class LostItemPatrol(Node):
         else:
             self.get_logger().info("Search mode deactivated. Waiting...")
             
-    # visited_spot 토픽이 들어오면 실행 / 값을 리스트 형태로 저장
+    # visited_spot 토픽이 들어오면 실행 사용자 이동 내역을 리스트 형태로 저장
     def topic_callback(self, msg):
         self.get_logger().info(f"Topic Received! Data: {msg.data}")
         self.visited_spot_raw = list(msg.data)
@@ -167,12 +167,12 @@ class LostItemPatrol(Node):
         self.is_detected = msg.data
     
     # 로봇1이 얼마나 가까이에 있는지 확인
-    def is_robot1_nearby(self, threshold=1.0):
+    def is_robot1_nearby(self, threshold=1.0):      # threshold: 안전 거리
         if self.robot1_pose is None or self.robot2_pose is None:
             self.get_logger().error(f'로봇 위치 못 받아옴')
             return False
 
-        dist = math.sqrt(
+        dist = math.sqrt(       # 로봇 간 직선 거리 계산
             (self.robot1_pose.position.x - self.robot2_pose.position.x)**2 +
             (self.robot1_pose.position.y - self.robot2_pose.position.y)**2
         )
@@ -248,6 +248,7 @@ class LostItemPatrol(Node):
         
         print(f"\n최종 방문할 장소 인덱스: {self.visited_spot}")
 
+        # 사용자 이동 내역이 없을 경우 종료
         if not self.visited_spot:
             self.navigator.info("No targets selected. Exiting.")
             return
@@ -255,16 +256,16 @@ class LostItemPatrol(Node):
         self.navigator.info('Starting patrol service...')
 
         if self.current_pose is not None:
-            start_pose = self.current_pose
+            start_pose = self.current_pose  # 로봇의 현재 위치 저장
         else:
             self.get_logger().warn('No Pose')
 
-        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)
+        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot) # 최적 경로 계산
 
         path_names = [self.goal_options[i]['name'] for i in best_route]
         self.navigator.info(f'Optimized Route: {path_names}')
 
-        # 3. 주행 시작
+        # 주행 시작
         for index in best_route:
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
@@ -291,8 +292,8 @@ class LostItemPatrol(Node):
                 # 로봇1,2간의 거리가 2미터 이내 일때
                 if self.is_robot1_nearby(2):
                     self.navigator.info("Robot 3 approaching! Yielding...")
-                    self.stop_robot()
                     self.navigator.cancelTask()
+                    self.stop_robot()
 
                     # 로봇간의 거리가 2미터 이상이 될 때 까지 대기
                     while self.is_robot1_nearby(2):

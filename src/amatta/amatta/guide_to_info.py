@@ -1,5 +1,5 @@
-# robot 1 구동하는 코드: db에서 분실물 관련 토픽 구독해 보관소에 분실물 유무에 따른 가이드 모드 및 탐색 모드
-
+# Robot 1: 분실물 등록 여부에 따른 모드 전환, 가이드 모드 코드
+# [기능] DB에서 분실물 정보를 구독하여 등록 시 안내 모드, 미등록 시 탐색 모드(신호 발행) 수행
 import rclpy
 import time
 from rclpy.node import Node
@@ -10,7 +10,7 @@ from nav2_simple_commander.robot_navigator import TaskResult
 from airport_guide_interfaces.msg import DbInfo
 
 # INPUTS (topics):
-# - /is_registered (airport_guide_interfaces/DbInfo): DB 등록 결과 수신. 등록 True면 가이딩 시작.
+# - /is_registered (airport_guide_interfaces/DbInfo): DB 등록 결과 수신. True면 가이딩 모드 시작, False면 탐색 모드 시작
 # OUTPUTS (topics):
 # - /search_mode (std_msgs/Bool): 등록 전 탐색 모드 요청(True) 퍼블리시.
 
@@ -45,7 +45,7 @@ class GuideToInfo(Node):
             'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)}
         ]
 
-        ################ 테스트 완료 후 초기 위치만 남기기 ###############
+        ################ 테스트 완료 후 setInitialPose만 남기기 ###############
         # 1. 초기화 및 Docking 상태 확인
         if not self.navigator.getDockedStatus():
             self.navigator.info('Docking before initialising pose')
@@ -61,7 +61,7 @@ class GuideToInfo(Node):
         self.navigator.info('After Nav')
         self.navigator.undock()
 
-    def timer_callback(self):
+    def timer_callback(self):       # DB의 분실물 여부 퍼블리시
         msg = Bool()
         if not self.registered:
             msg.data = True
@@ -80,8 +80,8 @@ class GuideToInfo(Node):
             self.navigator.startToPose(self.target_pose[0]['pose'])
             while not self.navigator.isTaskComplete():
                 time.sleep(0.1)
-            result = self.navigator.getResult()
-            if result == TaskResult.SUCCEEDED:
+            result = self.navigator.getResult()# 이 경우에만 코드 종료되도록 수정 필요
+            if result == TaskResult.SUCCEEDED:      
                 self.navigator.info(f'Arrived at entrance!')
                 time.sleep(2.0)
             elif result == TaskResult.CANCELED:
