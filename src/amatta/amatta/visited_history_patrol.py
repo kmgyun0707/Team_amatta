@@ -11,6 +11,10 @@ from nav2_simple_commander.robot_navigator import TaskResult
 from std_msgs.msg import Int32MultiArray,Bool
 from geometry_msgs.msg import Twist
 
+from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
+import threading
+
 # INPUTS (topics):
 # - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
 # - /search_mode (std_msgs/Bool) : 탐색 모드 실행 (False면 대기/ True면 탐색) 요청 구독
@@ -23,6 +27,9 @@ from geometry_msgs.msg import Twist
 class VisitedHistoryPatrol(Node):
     def __init__(self):
         super().__init__('visited_history_patrol')
+        # 콜백 그룹 생성 (이 그룹에 속한 콜백들은 병렬 실행 가능)
+        self.callback_group = ReentrantCallbackGroup()
+
         self.navigator = TurtleBot4Navigator()
 
         # 토픽 수신 여부와 데이터를 저장할 변수 초기화
@@ -37,14 +44,16 @@ class VisitedHistoryPatrol(Node):
             Bool,
             '/search_mode',
             self.search_mode_callback,
-            10)
+            10,
+            callback_group=self.callback_group)
         
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
             Int32MultiArray,
             '/visited_spot',
             self.topic_callback,
-            10
+            10,
+            callback_group=self.callback_group
         )
 
         # 로봇 1의 현재 위치 구독 -> 경로 생성 사용
@@ -52,7 +61,8 @@ class VisitedHistoryPatrol(Node):
             PoseWithCovarianceStamped,
             '/robot1/amcl_pose',
             self.pose_callback,
-            10
+            10,
+            callback_group=self.callback_group
         )
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
@@ -60,13 +70,17 @@ class VisitedHistoryPatrol(Node):
             Bool,
             '/is_detected',
             self.detection_callback,
-            10)
+            10,
+            callback_group=self.callback_group
+        )
 
         # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
             '/robot1/cmd_vel',
-            10)
+            10,
+            callback_group=self.callback_group
+        )
         
         # 목표 지점 정의 (robot 1 좌표 기준)
         self.goal_options = [
@@ -208,24 +222,27 @@ class VisitedHistoryPatrol(Node):
             return
 
         ################333
-        timeout = 3.0  # 3초 타임아웃
-        start_time = time.time()
-        while self.current_pose is None:
-            if time.time() - start_time > timeout:
-                self.get_logger().warn('No amcl_pose received. Using default start position for testing.')
-                start_pose = self.create_pose(0.0,3.0, 0.9881, 0.1536)
-                break  # while 루프 탈출
-            self.get_logger().info('Waiting for current pose...')
-            rclpy.spin_once(self, timeout_sec=0.5)
-        else:
-            start_pose = self.current_pose  # 로봇의 현재 위치 저장
-
-        # if self.current_pose is None:  
-        #     return          # 로봇의 현재 위치 저장
+        # timeout = 3.0  # 3초 타임아웃
+        # start_time = time.time()
+        # while self.current_pose is None:
+        #     if time.time() - start_time > timeout:
+        #         self.get_logger().warn('No amcl_pose received. Using default start position for testing.')
+        #         start_pose = self.create_pose(0.0,3.0, 0.9881, 0.1536)
+        #         break  # while 루프 탈출
+        #     self.get_logger().info('Waiting for current pose...')
+        #     rclpy.spin_once(self, timeout_sec=0.5)
         # else:
-        #     self.get_logger().warn('No Pose')
-        #     start_pose = self.current_pose  
+        #     start_pose = self.current_pose  # 로봇의 현재 위치 저장
+
+        if self.current_pose is None:  
+            self.get_logger().warn('Waiting for initial pose...')
+            time.sleep(1.0)         # 로봇의 현재 위치 저장
+
+            if self.current_pose is None:
+                self.get_logger().warn('No Pose')
+                self.current_pose = self.navigator.getPoseStamped([0,0], TurtleBot4Directions.NORTH)
         
+        start_pose = self.current_pose
         self.navigator.info('Calculating best route to retrace steps...')
         best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)     # 최적 경로 계산
 
@@ -279,15 +296,23 @@ def main(args=None):
     
     tracer = VisitedHistoryPatrol()
 
+    # [핵심 변경] Executor를 생성하고 Node를 추가
+    executor = MultiThreadedExecutor()
+    executor.add_node(tracer)
+
+    # [핵심 변경] Executor를 별도 쓰레드(Daemon)에서 실행
+    # 이렇게 하면 spin()이 백그라운드에서 계속 돌며 콜백(위치 수신, 탐지 등)을 처리합니다.
+    executor_thread = threading.Thread(target=executor.spin, daemon=True)
+    executor_thread.start()
+
     try:
         while rclpy.ok():
-            # 외부 토픽이 들어왔는지 한 번 확인
-            rclpy.spin_once(tracer, timeout_sec=0.1)
-            
             # 데이터를 받으면 순찰 시작
             if tracer.search_mode and tracer.is_data_received:
                 tracer.run_patrol()
                 tracer.is_data_received = False 
+                tracer.is_data_received = False 
+                tracer.search_mode = False 
                 # 탐색이 끝나면 프로그램 종료
                 break 
                 

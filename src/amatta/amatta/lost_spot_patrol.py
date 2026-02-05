@@ -305,14 +305,14 @@ class LostItemPatrol(Node):
                     self.stop_robot()       # 추후 접근으로 구현 필요
                     return
 
-                # 로봇1,2간의 거리가 2미터 이내 일때
-                if self.is_robot1_nearby(2.0):
+                # 로봇1,2간의 거리가 1미터 이내 일때
+                if self.is_robot1_nearby(1.0):
                     self.navigator.info("Robot 1 approaching! Yielding...")
                     self.navigator.cancelTask()
                     self.stop_robot()
 
-                    # 로봇간의 거리가 2미터 이상이 될 때 까지 대기
-                    while self.is_robot1_nearby(2.0):
+                    # 로봇간의 거리가 1미터 이상이 될 때 까지 대기
+                    while self.is_robot1_nearby(1.0):
                         self.navigator.info("Robot 1 approaching! Yielding...")
                         time.sleep(1.0)
                     
