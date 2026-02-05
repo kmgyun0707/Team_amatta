@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -20,4 +20,161 @@
     </a>
 
 </body>
+</html> -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Ad Detect</title>
+  <style>
+    body { font-family: sans-serif; }
+    .wrap { width: 520px; margin: 24px auto; }
+    .map-panel {
+      margin-top: 18px;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 12px;
+    }
+    .map-title { font-weight: 700; margin-bottom: 10px; }
+    .map-stage { position: relative; width: 100%; }
+    #mapImg { width: 100%; display: block; border-radius: 10px; }
+    #mapCanvas { position: absolute; left: 0; top: 0; }
+    .legend { margin-top: 10px; font-size: 13px; color: #444; display:flex; gap:12px; flex-wrap:wrap;}
+    .dot { font-weight: 900; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>실시간 로봇 현황</h1>
+  <p>여기서 ad_detect 로직이 실행될 예정입니다.</p>
+
+  <a href="{{ url_for('ad_load_db.ad_load_db') }}">
+    <button style="padding:12px 24px; font-size:15px; cursor:pointer;">
+      데이터베이스
+    </button>
+  </a>
+
+  <!-- ✅ 하단 맵 패널 -->
+  <div class="map-panel">
+    <div class="map-title">맵 / 로봇 위치</div>
+
+    <div class="map-stage">
+      <!-- ✅ 서버에서 넘겨주는 맵 이미지 -->
+      <img id="mapImg" src="{{ map_image_url }}" alt="map">
+      <canvas id="mapCanvas"></canvas>
+    </div>
+
+    <div class="legend">
+      <span><span class="dot">●</span> robot1</span>
+      <span><span class="dot">●</span> robot3</span>
+      <span id="statusText">status: -</span>
+    </div>
+  </div>
+</div>
+
+<div id="map-meta"
+     data-resolution='{{ map_resolution | tojson }}'
+     data-origin='{{ map_origin | tojson }}'>
+</div>
+
+<script>
+  // =========================
+  // ✅ TODO: 좌표 변환에 쓰는 맵 메타 (map.yaml 기반)
+  // =========================
+  const meta = document.getElementById("map-meta");
+
+  // JSON 문자열 → JS 값
+  const MAP_RESOLUTION = JSON.parse(meta.dataset.resolution);
+  const MAP_ORIGIN = JSON.parse(meta.dataset.origin);
+
+  const img = document.getElementById("mapImg");
+  const canvas = document.getElementById("mapCanvas");
+  const ctx = canvas.getContext("2d");
+  const statusText = document.getElementById("statusText");
+
+  function resizeCanvasToImage() {
+    // 이미지가 화면에서 줄어들 수 있으니 "표시 크기" 기준으로 맞춤
+    const w = img.clientWidth;
+    const h = img.clientHeight;
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+  }
+
+  // map 좌표(m) -> canvas 픽셀 좌표(px)
+  function mapToPixel(x, y, mapImageNaturalWidth, mapImageNaturalHeight) {
+    // =========================
+    // ✅ TODO: 만약 점이 뒤집혀서 찍히면 여기만 수정하면 됨
+    // - y축 뒤집힘 여부
+    // - origin 적용 방식
+    // =========================
+    const originX = MAP_ORIGIN[0];
+    const originY = MAP_ORIGIN[1];
+
+    // 원본 맵 픽셀 좌표(자연 크기 기준)
+    const px = (x - originX) / MAP_RESOLUTION;
+    const py_from_bottom = (y - originY) / MAP_RESOLUTION;
+    const py = mapImageNaturalHeight - py_from_bottom; // 이미지 좌표계(top-left)로 변환
+
+    return {px, py};
+  }
+
+  function drawDot(px, py, colorName) {
+    // canvas는 현재 "표시 크기" 기준이므로, natural->display 스케일 적용 필요
+    const sx = canvas.width / img.naturalWidth;
+    const sy = canvas.height / img.naturalHeight;
+
+    const x = px * sx;
+    const y = py * sy;
+
+    // 점
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = colorName;   // 색은 간단히 문자열로
+    ctx.fill();
+
+    // 테두리
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+  }
+
+  async function fetchAndRender() {
+    try {
+      const res = await fetch("/ad_detect/api/poses", {cache: "no-store"});
+      const data = await res.json();
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // robot1
+      if (data.robot1 && data.robot1.x !== null) {
+        const p1 = mapToPixel(data.robot1.x, data.robot1.y, img.naturalWidth, img.naturalHeight);
+        drawDot(p1.px, p1.py, "red");
+      }
+
+      // robot3
+      if (data.robot3 && data.robot3.x !== null) {
+        const p3 = mapToPixel(data.robot3.x, data.robot3.y, img.naturalWidth, img.naturalHeight);
+        drawDot(p3.px, p3.py, "blue");
+      }
+
+      statusText.textContent = "status: OK";
+    } catch (e) {
+      statusText.textContent = "status: FAIL (API/ROS 확인)";
+    }
+  }
+
+  img.addEventListener("load", () => {
+    resizeCanvasToImage();
+    fetchAndRender();
+    setInterval(fetchAndRender, 200); // ✅ 0.2초마다 갱신 (TODO: 부하 크면 500~1000ms로)
+  });
+
+  window.addEventListener("resize", () => {
+    resizeCanvasToImage();
+  });
+</script>
+</body>
 </html>
+

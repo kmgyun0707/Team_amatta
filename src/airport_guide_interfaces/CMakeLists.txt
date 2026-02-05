@@ -24,11 +24,16 @@ if(BUILD_TESTING)
 endif()
 
 find_package(rosidl_default_generators REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(airport_guide_interfaces
   "msg/DbInfo.msg"
   "msg/SearchResult.msg"
   "msg/FoundItem.msg"
+  DEPENDENCIES sensor_msgs geometry_msgs
 )
 
+
+ament_export_dependencies(rosidl_default_runtime)
 ament_package()
