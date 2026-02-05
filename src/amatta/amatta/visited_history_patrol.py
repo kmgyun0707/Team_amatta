@@ -1,29 +1,44 @@
-# robot 1 구동하는 코드: 사용자가 입력한 이동 경로를 따라 탐색
+# robot 1 구동하는 코드: 사용자가 입력한 이동 경로를 따라 최단 경로 탐색
+
 import rclpy
 from rclpy.node import Node
-
 import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
 from nav2_simple_commander.robot_navigator import TaskResult
-from std_msgs.msg import Int32MultiArray
+from std_msgs.msg import Int32MultiArray,Bool
+from geometry_msgs.msg import Twist
+
+# INPUTS (topics):
+# - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
+# - /search_mode (std_msgs/Bool) : 탐색 모드 실행 (False면 대기/ True면 탐색) 요청 구독
+# - /is_detected (std_msgs/Bool) : 분실물이 탐지 되었는지 bool 구독
+# - /robot1/amcl_pose (geometry_msgs/PoseWithCovarianceStamped) : 로봇 1의 현재 위치 구독
+# OUTPUTS (topics):
+# - /robot1/cmd_vel (geometry_msgs/Twist) : 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행
 
 
 class VisitedHistoryPatrol(Node):
-    """
-    사용자가 방문했던 장소들(History)을 입력받아,
-    최단 거리로 해당 장소들을 순찰(Retrace)하는 클래스
-    """
     def __init__(self):
         super().__init__('visited_history_patrol')
         self.navigator = TurtleBot4Navigator()
 
-        # [추가] 토픽 수신 여부와 데이터를 저장할 변수
-        self.visited_spot = []              # 사용자의 방문 이력
-        self.is_data_received = False       # 데이터 서브스크라이브 여부
+        # 토픽 수신 여부와 데이터를 저장할 변수
+        self.visited_spot = []
+        self.is_data_received = False 
+        self.search_mode = False
+        self.is_detected = False
 
+        # guide_to_info에서 발행하는 탐색 모드 토픽 구독
+        self.search_mode_sub = self.create_subscription(
+            Bool,
+            '/search_mode',
+            self.search_mode_callback,
+            10)
+        
+        # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
             Int32MultiArray,
             '/visited_spot',
@@ -31,6 +46,7 @@ class VisitedHistoryPatrol(Node):
             10
         )
 
+        # 로봇 1의 현재 위치 구독
         self.subscription_pose = self.create_subscription(
             PoseWithCovarianceStamped,
             '/robot1/amcl_pose',
@@ -38,9 +54,20 @@ class VisitedHistoryPatrol(Node):
             10
         )
 
-        
+        # 분실물이 감지 되었는지 Bool 값 토픽 구독
+        self.detection_sub = self.create_subscription(
+            Bool,
+            '/is_detected',
+            self.detection_callback,
+            10)
 
-        # 4. 목표 지점(장소 DB) 정의
+        # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행
+        self.cmd_vel_pub = self.navigator.create_publisher(
+            Twist,
+            '/robot1/cmd_vel',
+            10)
+        
+        # 목표 지점 정의 (robot 1 좌표 기준)
         self.goal_options = [
             # 0 입구 (Entrance)
             {'name': 'Entrance',
@@ -74,7 +101,6 @@ class VisitedHistoryPatrol(Node):
             {'name': 'Mens_Room',
             'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
         ]
-
         self.gate_options = [
             # 0 Gate 1
             {'name': 'Gate_1',
@@ -84,6 +110,7 @@ class VisitedHistoryPatrol(Node):
             {'name': 'Gate_2',
             'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
         ]
+
 
         # 1. 초기화 및 Docking 상태 확인
         if not self.navigator.getDockedStatus():
@@ -98,18 +125,30 @@ class VisitedHistoryPatrol(Node):
         self.navigator.waitUntilNav2Active()
         self.navigator.undock()
 
+    def search_mode_callback(self, msg):
+        self.search_mode = msg.data
+        if self.search_mode:
+            self.get_logger().info("Search mode activated! Ready to patrol.")
+        else:
+            self.get_logger().info("Search mode deactivated. Waiting...")
+            
+    # visited_spot 토픽이 들어오면 실행 / 값을 리스트 형태로 저장
     def topic_callback(self, msg):
         self.get_logger().info(f"Topic Received! Data: {msg.data}")
         self.visited_spot= list(msg.data)
         self.is_data_received = True
 
+    # amcl_pose토픽에서 좌표와 방향만 필요하기 때문에 PoseStamped 규격으로 필요한 정보만 저장
     def pose_callback(self, msg):
-        # AMCL은 PoseWithCovarianceStamped를 주지만, 
-        # 우리가 필요한 건 PoseStamped이므로 변환해서 저장합니다.
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
-        
+    
+    # 분실물을 발견했는지 실시간 저장
+    def detection_callback(self, msg):
+        self.is_detected = msg.data
+
+    # x,y,방향 값을 받아 PostStamped 형식으로 변환
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
         pose.header.frame_id = 'map'
@@ -123,6 +162,7 @@ class VisitedHistoryPatrol(Node):
         pose.pose.orientation.w = float(w_orient)
         return pose
 
+    # 목표 지점 사이 직선거리
     def get_distance(self, pose1, pose2):
         x1 = pose1.pose.position.x
         y1 = pose1.pose.position.y
@@ -130,14 +170,14 @@ class VisitedHistoryPatrol(Node):
         y2 = pose2.pose.position.y
         return math.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
+    # Brute 알고리즘으로 사용자가 입력한 이동 경로 중 최단 경로 탐색
     def find_best_route_brute_force(self, start_pose, spots_indices):
-        """방문했던 장소들을 가장 효율적으로 도는 순서를 계산"""
         min_distance = float('inf')
         best_order = []
         
         # 순열 생성 (모든 방문 순서 고려)
         possible_paths = itertools.permutations(spots_indices)
-        
+        # 순서 조합을 하나씩 실제로 주행했을 때 거리 계산
         for path in possible_paths:
             current_distance = 0.0
             current_pose = start_pose
@@ -154,42 +194,24 @@ class VisitedHistoryPatrol(Node):
                 
         return best_order, min_distance
 
-    # def get_user_history(self):
-    #     """사용자로부터 방문했던 장소(이력)를 입력받음"""
-    #     print("\n" + "="*40)
-    #     print("      [ 장소 목록 (Location DB) ]")
-    #     for i, option in enumerate(self.goal_options):
-    #         print(f"  {i} : {option['name']}")
-    #     print("="*40)
+    # 로봇 정지
+    def stop_robot(self):
+        stop_msg = Twist()
+        stop_msg.linear.x = 0.0
+        stop_msg.linear.y = 0.0
+        stop_msg.linear.z = 0.0
+        stop_msg.angular.x = 0.0
+        stop_msg.angular.y = 0.0
+        stop_msg.angular.z = 0.0
+        
+        # 확실하게 멈추기 위해 여러 번 publish
+        for _ in range(10):
+            self.cmd_vel_pub.publish(stop_msg)
+            time.sleep(0.01)
 
-    #     while True:
-    #         try:
-    #             # 멘트 수정: 방문했던 장소를 묻는 형태로 변경
-    #             user_input = input("\n사용자가 방문했던 장소의 번호를 공백으로 구분해 입력하세요 (예: 0 2): ")
-                
-    #             if not user_input.strip():
-    #                 print("입력값이 없습니다. 다시 입력해주세요.")
-    #                 continue
-
-    #             input_indices = list(set(map(int, user_input.split())))
-
-    #             # 유효성 검사
-    #             invalid_indices = [idx for idx in input_indices if idx < 0 or idx >= len(self.goal_options)]
-    #             if invalid_indices:
-    #                 print(f"오류: 존재하지 않는 장소 번호입니다: {invalid_indices}")
-    #                 continue
-                
-    #             return input_indices
-
-    #         except ValueError:
-    #             print("오류: 숫자만 입력해주세요.")
-
+    # 최단 경로 주행
     def run_patrol(self):
         self.navigator.info('Initializing User History Tracer...')
-
-        # 1. 방문 이력 입력 받기
-        # visited_history = self.get_user_history()
-        # print(f"\n입력된 방문 이력: {visited_history}")
 
         if not self.visited_spot:
             self.navigator.info("No visited_spot provided. Exiting.")
@@ -208,7 +230,7 @@ class VisitedHistoryPatrol(Node):
         print(f"  최적 탐색 경로: {' -> '.join(path_names)}")
         print("*"*50 + "\n")
 
-        # 3. 주행 시작 (자취 따라가기)
+        # 3. 주행 시작
         for index in best_route:
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
@@ -217,34 +239,47 @@ class VisitedHistoryPatrol(Node):
             self.navigator.startToPose(target_pose)
 
             while not self.navigator.isTaskComplete():
+                # 주행 중에도 실시간 센서/위치 데이터를 업데이트하기 위해 호출
+                rclpy.spin_once(self, timeout_sec=0.01)
+
+                # 분실물 발견시 stop
+                if self.is_detected:
+                    self.navigator.cancelTask()
+                    self.stop_robot()       # 추후 접근으로 구현 필요
+                    return
                 time.sleep(0.1)
 
             result = self.navigator.getResult()
             if result == TaskResult.SUCCEEDED:
                 self.navigator.info(f'Checked {target_name} (Visited Spot).')
-                time.sleep(2.0) # 탐색 시간
+                time.sleep(2.0)
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to {target_name} was canceled.')
             elif result == TaskResult.FAILED:
                 self.navigator.error(f'Failed to reach {target_name}.')
+
+        # 분실물이 발견이 되면 DB 업로드 (추후 추가 예정)
+        if not self.is_detected:
+            self.navigator.info('DB Upload')
 
         self.navigator.info('History check completed. Returning to dock...')
 
 def main(args=None):
     rclpy.init(args=args)
     
-    # 클래스 인스턴스 생성 및 실행
     tracer = VisitedHistoryPatrol()
 
     try:
-        # [핵심 수정] 데이터가 들어올 때까지 Node를 Spin(대기) 시킵니다.
         while rclpy.ok():
+            # 외부 토픽이 들어왔는지 한 번 확인
             rclpy.spin_once(tracer, timeout_sec=0.1)
             
-            if tracer.is_data_received:
-                # 데이터를 받으면 순찰 시작
+            # 데이터를 받으면 순찰 시작
+            if tracer.search_mode and tracer.is_data_received:
                 tracer.run_patrol()
-                break # 순찰이 끝나면 프로그램 종료 (계속 대기하려면 break 제거 및 플래그 초기화)
+                tracer.is_data_received = False 
+                # 탐색이 끝나면 프로그램 종료
+                break 
                 
     except KeyboardInterrupt:
         pass

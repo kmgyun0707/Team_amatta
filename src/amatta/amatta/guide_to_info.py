@@ -1,11 +1,18 @@
 # robot 1 구동하는 코드: db에서 분실물 관련 토픽 구독해 보관소에 분실물 유무에 따른 가이드 모드 및 탐색 모드
+
 import rclpy
+import time
 from rclpy.node import Node
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import Bool
+from nav2_simple_commander.robot_navigator import TaskResult
 from airport_guide_interfaces.msg import DbInfo
 
+# INPUTS (topics):
+# - /is_registered (airport_guide_interfaces/DbInfo): DB 등록 결과 수신. 등록 True면 가이딩 시작.
+# OUTPUTS (topics):
+# - /search_mode (std_msgs/Bool): 등록 전 탐색 모드 요청(True) 퍼블리시.
 
 class GuideToInfo(Node):
     def __init__(self):
@@ -55,21 +62,36 @@ class GuideToInfo(Node):
         self.navigator.undock()
 
     def timer_callback(self):
+        msg = Bool()
         if not self.registered:
-            msg = Bool()
             msg.data = True
+        else:
+            msg.data = False
         
         self.publisher.publish(msg)
 
     
     def db_callback(self, msg):
         self.registered = msg.registered
+        # 분실물이 있으면 분실물 보관소로 이동
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
-            self.navigator.startToPose(self.target_pose)
+
+            self.navigator.startToPose(self.target_pose[0]['pose'])
+            while not self.navigator.isTaskComplete():
+                time.sleep(0.1)
+            result = self.navigator.getResult()
+            if result == TaskResult.SUCCEEDED:
+                self.navigator.info(f'Arrived at entrance!')
+                time.sleep(2.0)
+            elif result == TaskResult.CANCELED:
+                self.navigator.info(f'Navigation to entrance was canceled.')
+            elif result == TaskResult.FAILED:
+                self.navigator.error(f'Failed to reach entrance.')
 
 
-        
+
+    # x,y,방향 값을 받아 PostStamped 형식으로 변환
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
         pose.header.frame_id = 'map'
@@ -85,12 +107,9 @@ class GuideToInfo(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    
-    # 클래스 인스턴스 생성 및 실행
     guide = GuideToInfo()
 
     try:
-        # [핵심 수정] 데이터가 들어올 때까지 Node를 Spin(대기) 시킵니다.
         while rclpy.ok():
             rclpy.spin(guide)
             
