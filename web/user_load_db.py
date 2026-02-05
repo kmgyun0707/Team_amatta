@@ -6,6 +6,7 @@
 # 웹 화면에 JSON 형태로 전달해준다.
 
 from flask import render_template, request, jsonify, Blueprint
+from web.location_mapper import xy_to_place_korean
 import sqlite3
 import os
 
@@ -127,7 +128,18 @@ def filter_items():
     items = []
     for row in rows:
         d = dict(row)
+
+        # ✅ 1) (x,y) 좌표 -> 한글 위치명 변환해서 추가
+        # item 테이블에 robot_name 컬럼이 있으면 그걸 쓰고,
+        # 없으면 일단 robot1로 가정(정확히 하려면 robot_name 컬럼 추가 추천)
+        robot = d.get("robot_name") or d.get("robot") or "robot1"
+        x = d.get("location_x")
+        y = d.get("location_y")
+        d["location_name"] = xy_to_place_korean(robot, x, y, tolerance_m=2.0) # <= 실제로 할 때는 0.5로 줄이쟈잉
+
+        # ✅ 2) 이미지 경로를 /static/... URL로 변환
         d["image_path"] = to_public_url(d.get("image_path"))
+
         items.append(d)
 
     # JSON 형태로 프론트엔드롤 전달

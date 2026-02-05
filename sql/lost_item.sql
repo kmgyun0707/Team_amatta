@@ -3,6 +3,7 @@ CREATE TABLE item(
     category TEXT not NULL,
     color TEXT null,
     time datetime not null default current_timestamp,
+    robot_name TEXT not null,
     location_x REAL not NULL,
     location_y REAL not NULL,
     image_path TEXT,
