@@ -30,8 +30,8 @@ class VisitedHistoryPatrol(Node):
         self.is_data_received = False   # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
         self.is_detected = False        # 분실물을 인지했는지 여부
-        self.current_pose = None
-        
+        self.current_pose = None 
+
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
@@ -194,8 +194,9 @@ class VisitedHistoryPatrol(Node):
         
         # 확실하게 멈추기 위해 여러 번 publish
         for _ in range(3):
+            self.get_logger().info("in stop robot pub*****")
             self.cmd_vel_pub.publish(stop_msg)
-            time.sleep(0.01)
+            time.sleep(1)
 
     # 최단 경로 주행
     def run_patrol(self):
@@ -206,10 +207,24 @@ class VisitedHistoryPatrol(Node):
             self.navigator.info("No visited_spot provided. Exiting.")
             return
 
-        if self.current_pose is not None:
-            start_pose = self.current_pose              # 로봇의 현재 위치 저장
+        ################333
+        timeout = 3.0  # 3초 타임아웃
+        start_time = time.time()
+        while self.current_pose is None:
+            if time.time() - start_time > timeout:
+                self.get_logger().warn('No amcl_pose received. Using default start position for testing.')
+                start_pose = self.create_pose(0.0,3.0, 0.9881, 0.1536)
+                break  # while 루프 탈출
+            self.get_logger().info('Waiting for current pose...')
+            rclpy.spin_once(self, timeout_sec=0.5)
         else:
-            self.get_logger().warn('No Pose')
+            start_pose = self.current_pose  # 로봇의 현재 위치 저장
+
+        # if self.current_pose is None:  
+        #     return          # 로봇의 현재 위치 저장
+        # else:
+        #     self.get_logger().warn('No Pose')
+        #     start_pose = self.current_pose  
         
         self.navigator.info('Calculating best route to retrace steps...')
         best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)     # 최적 경로 계산
@@ -227,13 +242,17 @@ class VisitedHistoryPatrol(Node):
             self.navigator.info(f'Retracing path to {target_name}...')
             self.navigator.startToPose(target_pose)
 
+            self.get_logger().info("11111111111111111*****")
             while not self.navigator.isTaskComplete():      # 로봇이 이동 중일 때 인지 여부 확인
                 # 주행 중에도 실시간 센서/위치 데이터를 업데이트하기 위해 호출
+                self.get_logger().info("222222222222222*****")
                 rclpy.spin_once(self, timeout_sec=0.01)
-
+                self.get_logger().info("333333333333333333333*****")
                 # 분실물 인지 시 stop
                 if self.is_detected:
+                    self.get_logger().info("in is_detected*****")
                     self.navigator.cancelTask()
+                    self.get_logger().info("nect cancelTask*****")
                     self.stop_robot()       # 추후 접근으로 구현 필요
                     return
                 time.sleep(0.1)
