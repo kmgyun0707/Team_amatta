@@ -31,7 +31,7 @@
   </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap" data-lost-id="{{ lost_id }}">
     <div class="msg">분실물 탐색을 시작합니다</div>
     <div class="sub">로봇이 방문 경로를 따라 이동하며 분실물을 탐색합니다.</div>
 
@@ -42,5 +42,32 @@
     <button class="btn" onclick="location.href='/'">목록으로 돌아가기</button>
     <button class="btn btn2" onclick="history.back()">이전으로</button>
   </div>
+  <script>
+    const wrap = document.querySelector(".wrap");
+    const lostIdRaw = wrap?.dataset?.lostId;
+    const lostId = lostIdRaw ? Number(lostIdRaw) : null;
+
+    async function poll() {
+      if (lostId === null || Number.isNaN(lostId)) return;
+
+      try {
+        const res = await fetch(`/search_status?lost_id=${lostId}`);
+        const data = await res.json();
+
+        if (!data.ok) return;
+
+        if (data.state === "회수") {
+          location.href = `/search_success?lost_id=${lostId}`;
+        } else if (data.state === "분실") {
+          location.href = `/search_fail?lost_id=${lostId}`;
+        }
+      } catch (e) {
+        // 네트워크 에러 무시
+      }
+    }
+
+    setInterval(poll, 1500);
+    poll();
+  </script>
 </body>
 </html>

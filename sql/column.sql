@@ -1,7 +1,3 @@
-insert into item (category, location_x, location_y, state)
-values('wallet', 3,5, '보관중');
-
-
 -- 모든 상태가 '분실'인 테스트 데이터
 INSERT INTO item_lost (name, phone, category, color, gate, state)
 VALUES

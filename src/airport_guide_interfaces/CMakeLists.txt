@@ -27,6 +27,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(airport_guide_interfaces
   "msg/DbInfo.msg"
+  "msg/SearchResult.msg"
 )
 
 ament_package()
