@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AMR Monitoring - Admin</title>
+    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
+    <style>
+        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .monitor-box { border: 2px solid #333; border-radius: 10px; overflow: hidden; background: #000; }
+        .info-panel { margin-top: 20px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .card { background: #f4f4f4; padding: 15px; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
+        .data { font-weight: bold; color: #007bff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>AMR 실시간 모니터링</h1>
+
+        <div class="monitor-box">
+            <img src="http://{{ robot_ip }}:8080/stream?topic=/camera/image_raw" 
+                 alt="AMR Camera Stream" width="640" height="480">
+        </div>
+
+        <div class="info-panel">
+            <div class="card">
+                <h3>배터리 상태</h3>
+                <p><span id="battery" class="data">--</span> %</p>
+            </div>
+            <div class="card">
+                <h3>현재 위치 (Pose)</h3>
+                <p>X: <span id="pos-x" class="data">0.00</span></p>
+                <p>Y: <span id="pos-y" class="data">0.00</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Rosbridge 연결 설정
+        const ros = new ROSLIB.Ros({
+            url: 'ws://{{ robot_ip }}:9090'
+        });
+
+        // 연결 확인
+        ros.on('connection', () => { console.log('Connected to websocket server.'); });
+        ros.on('error', (error) => { console.log('Error connecting to websocket server: ', error); });
+
+        // 배터리 데이터 구독 (Topic 이름은 로봇 환경에 맞춰 수정하세요)
+        const batterySub = new ROSLIB.Topic({
+            ros : ros,
+            name : '/battery_state',
+            messageType : 'sensor_msgs/BatteryState'
+        });
+
+        batterySub.subscribe((message) => {
+            // 배터리 비율(0.0~1.0)을 퍼센트로 표시
+            document.getElementById('battery').innerText = (message.percentage * 100).toFixed(1);
+        });
+
+        // 로봇 좌표 구독 (Nav2 사용 시 /amcl_pose 또는 /odom)
+        const poseSub = new ROSLIB.Topic({
+            ros : ros,
+            name : '/amcl_pose',
+            messageType : 'geometry_msgs/PoseWithCovarianceStamped'
+        });
+
+        poseSub.subscribe((message) => {
+            const pose = message.pose.pose.position;
+            document.getElementById('pos-x').innerText = pose.x.toFixed(2);
+            document.getElementById('pos-y').innerText = pose.y.toFixed(2);
+        });
+    </script>
+</body>
+</html>

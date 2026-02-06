@@ -1,0 +1,67 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>안내 시작</title>
+  <style>
+    body { font-family: sans-serif; background:#f6f7fb; margin:0; }
+    .wrap {
+      width: 420px;
+      margin: 80px auto;
+      background: white;
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .msg { font-size: 18px; font-weight: 700; margin: 10px 0 6px; }
+    .sub { font-size: 13px; color: #666; margin-top: 8px; }
+    .ok { color: #0a7a2f; font-weight: 700; margin-top: 12px; }
+    .bad { color: #b00020; font-weight: 700; margin-top: 12px; }
+    .btn {
+      width: 100%;
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+    }
+    .btn2 { background:#eee; color:#000; }
+  </style>
+</head>
+<body data-item-id="{{ item_id }}">
+  <div class="wrap">
+    <div class="msg">분실물 보관함으로 안내를 시작합니다</div>
+    <div class="sub">로봇에게 위치 정보를 전송 중입니다…</div>
+
+    <div id="status"></div>
+
+    <button class="btn" onclick="location.href='/user_load'">목록으로 돌아가기</button>
+    <button class="btn btn2" onclick="history.back()">이전으로</button>
+  </div>
+
+  <script>
+  const itemId = document.body.dataset.itemId;
+
+  fetch("/api/publish_guidance", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ item_id: itemId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    const el = document.getElementById("status");
+    if (res.ok) {
+      el.className = "ok";
+      el.textContent = "전송 완료! 로봇이 이동을 시작합니다.";
+    } else {
+      el.className = "bad";
+      el.textContent = "전송 실패: " + res.error;
+    }
+  });
+</script>
+
+</body>
+</html>
