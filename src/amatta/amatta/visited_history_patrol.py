@@ -6,7 +6,7 @@ import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist, Pose
 from nav2_simple_commander.robot_navigator import TaskResult
 from std_msgs.msg import Bool
 from airport_guide_interfaces.msg import DbInfo,DetectionInfo
@@ -46,7 +46,7 @@ class VisitedHistoryPatrol(Node):
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
-            f'{ns}/search_mode',
+            '/search_mode',
             self.search_mode_callback,
             10,
             callback_group=self.callback_group)
@@ -54,7 +54,7 @@ class VisitedHistoryPatrol(Node):
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
             DbInfo,
-            f'{ns}/is_registered',
+            '/is_registered',
             self.topic_callback,
             10,
             callback_group=self.callback_group
@@ -67,6 +67,13 @@ class VisitedHistoryPatrol(Node):
             self.pose_callback,
             10,
             callback_group=self.callback_group
+        )
+
+        ## 로봇1의 좌표 발행
+        self.robot1_pose_pub = self.create_publisher(
+            Pose, 
+            'robot1/simple_pose', 
+            10
         )
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
@@ -92,7 +99,6 @@ class VisitedHistoryPatrol(Node):
             callback_group=self.callback_group
         )
 
-        # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.is_found_pub = self.navigator.create_publisher(
             Bool,
             f'{ns}/is_found',
@@ -154,16 +160,18 @@ class VisitedHistoryPatrol(Node):
             
     # visited_spot 토픽이 들어오면 실행 / 사용자 이동 내역을 리스트 형태로 저장
     def topic_callback(self, msg):
-        self.get_logger().info(f"Topic Received! Data: {msg.visited_spots}")
         self.visited_spot= list(msg.visited_spots)
         self.gate_id = msg.gate_id - 8      # 게이트 1, 2이 8, 9로 들어오기 때문에 gate_options 인덱스에 맞게 빼줌
         self.registered = msg.registered
+        self.get_logger().info(f"Topic Received! gate : {self.gate_id}, registered : {self.registered}")
+        self.get_logger().info(f"Topic Received! visited spot : {self.visited_spot}")
 
     # amcl_pose토픽에서 좌표와 방향만 필요하기 때문에 PoseStamped 규격으로 필요한 정보만 저장
     def pose_callback(self, msg):
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
+        self.robot1_pose_pub.publish(self.current_pose.pose)
     
     # 분실물을 발견했는지 실시간 저장
     def detection_robot1_callback(self, msg):
@@ -230,7 +238,7 @@ class VisitedHistoryPatrol(Node):
         stop_msg.angular.z = 0.0
         
         # 확실하게 멈추기 위해 여러 번 publish
-        for _ in range(3):
+        for _ in range(2):
             self.get_logger().info("in stop robot pub*****")
             self.cmd_vel_pub.publish(stop_msg)
             time.sleep(1)
@@ -263,7 +271,7 @@ class VisitedHistoryPatrol(Node):
 
             if self.current_pose is None:
                 self.get_logger().warn('No Pose')
-                self.current_pose = self.navigator.getPoseStamped([0,0], TurtleBot4Directions.NORTH)
+                self.current_pose = self.navigator.getPoseStamped([0.0,0.0], TurtleBot4Directions.NORTH)
         
         start_pose = self.current_pose
         self.navigator.info('Calculating best route to retrace steps...')
@@ -347,7 +355,7 @@ def main(args=None):
     try:
         while rclpy.ok():
             # 데이터를 받으면 순찰 시작
-            if tracer.search_mode and tracer.registered:
+            if tracer.search_mode and not tracer.registered: 
                 tracer.run_patrol()
                 tracer.registered = False 
                 tracer.search_mode = False 

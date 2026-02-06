@@ -24,9 +24,12 @@ if(BUILD_TESTING)
 endif()
 
 find_package(rosidl_default_generators REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(airport_guide_interfaces
   "msg/DbInfo.msg"
+  "msg/DetectionInfo.msg"
+  DEPENDENCIES geometry_msgs
 )
 
 ament_package()

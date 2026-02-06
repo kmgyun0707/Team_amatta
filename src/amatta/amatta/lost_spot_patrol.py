@@ -6,7 +6,7 @@ import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist,Pose
 from nav2_simple_commander.robot_navigator import TaskResult
 from std_msgs.msg import Bool
 from airport_guide_interfaces.msg import DbInfo,DetectionInfo
@@ -48,7 +48,7 @@ class LostItemPatrol(Node):
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
             DbInfo,
-            f'{ns}/is_registered',
+            f'/is_registered',
             self.topic_callback,
             10,
             callback_group=self.callback_group)
@@ -56,7 +56,7 @@ class LostItemPatrol(Node):
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
-            f'{ns}/search_mode',
+            f'/search_mode',
             self.search_mode_callback,
             10,
             callback_group=self.callback_group)
@@ -76,14 +76,16 @@ class LostItemPatrol(Node):
             callback_group=self.callback_group
         )
 
-        # 로봇 1,2의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
-        self.robot1_sub = self.create_subscription(
-            PoseWithCovarianceStamped,
-            '/robot1/amcl_pose',
+        #### 로봇1 좌표만 구독
+        self.robot1_sub= self.create_subscription(
+            Pose,
+            'robot1/simple_pose',
             self.robot1_pose_callback,
             10,
-            callback_group=self.callback_group)
+            callback_group=self.callback_group
+        )
         
+        # 로봇 2의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
         self.robot2_sub = self.create_subscription(
             PoseWithCovarianceStamped,
             '/robot3/amcl_pose',
@@ -181,9 +183,7 @@ class LostItemPatrol(Node):
 
     # 로봇 1 : amcl 토픽중 좌표와 방향만 저장
     def robot1_pose_callback(self, msg):
-        self.current_pose = PoseStamped()
-        self.current_pose.header = msg.header
-        self.robot1_pose = msg.pose.pose
+        self.robot1_pose = msg
     
     # 로봇 2 : amcl 토픽중 좌표와 방향만 저장
     def pose_callback(self, msg):
@@ -376,7 +376,7 @@ class LostItemPatrol(Node):
             elif result == TaskResult.FAILED:
                 self.navigator.error(f'Failed to reach {target_name}.')
 
-        # 분실물이 발견이 되면 DB 업로드 (추후 추가 예정)
+        # 분실물이 발견이 되면 DB 업로드
         if not self.detected_robot1 and not self.detected_robot3:
             self.navigator.info('DB Upload')
 
@@ -407,7 +407,7 @@ def main(args=None):
             patrol_robot.get_logger().info(f'search mode: {patrol_robot.search_mode}')
             
             # Guide 노드로부터 search mode 받고, DB로부터 사용자 이동 경로 받으면 탐색 시작
-            if patrol_robot.search_mode and patrol_robot.registered:
+            if patrol_robot.search_mode and not patrol_robot.registered:
                 patrol_robot.run_patrol()
 
 

@@ -21,6 +21,8 @@ class GuideToInfo(Node):
         self.navigator = TurtleBot4Navigator()
         self.registered = None
         self.handle_registration = False
+        # 한번만 발행하기 위한 변수
+        self.search_mode_published = False
 
         # 토픽으로 탐색 모드 여부(True = 탐색모드 시작) 발행
         self.publisher = self.create_publisher(
@@ -73,15 +75,23 @@ class GuideToInfo(Node):
         # self.publisher.publish(msg)
         if self.registered is None:
             return 
+        if not self.search_mode_published:
+            msg = Bool()
+            msg.data = not self.registered
+            self.publisher.publish(msg)
+            self.search_mode_published = True
+            self.timer.cancel()
 
-        msg = Bool()
-        msg.data = not self.registered
-        self.publisher.publish(msg)
+        # msg = Bool()
+        # msg.data = not self.registered
+        # self.publisher.publish(msg)
 
     
     def db_callback(self, msg):
         self.get_logger().info("db in*************")
         if self.handle_registration:
+            return
+        if self.registered is not None:
             return
         self.registered = msg.registered
         self.get_logger().info(f"registered :{self.registered}")

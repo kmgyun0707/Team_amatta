@@ -30,7 +30,6 @@ class DbPublisher(Node):
                     data_list = [int(x) for x in user_input.split()]
                     
                     # 메시지 생성 및 데이터 할당
-                    msg = Int32MultiArray()
                     msg.visited_spots = data_list
                     
                     user_input_gate = input("\n방문할 게이트 입력 > ")
