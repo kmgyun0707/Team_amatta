@@ -1,5 +1,6 @@
+#!/usr/bin/env python3
 # DetectionResult를 받아 item 테이블에 저장
-# + GPT 비전으로 색상 추출 (한글 저장)
+# + OpenAI Responses API(새 방식)로 색상 추출 (한글 저장)
 # + 이미지 파일명: item_{id}.png 형식으로 저장
 
 import os
@@ -8,7 +9,8 @@ import threading
 import queue
 import base64
 import re
-from typing import Optional, Tuple
+import json
+from typing import Tuple
 
 import rclpy
 from rclpy.node import Node
@@ -29,8 +31,18 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 _db_lock = threading.Lock()
 _bridge = CvBridge()
 
-USE_GPT_COLOR = os.getenv("USE_GPT_COLOR", "0").strip() in ("1", "true", "True")
-OPENAI_API_KEY = os.getenv("", "").strip()
+# ✅ USE_GPT_COLOR=1 / true면 GPT로 색상 추출
+USE_GPT_COLOR = os.getenv("USE_GPT_COLOR", "0").strip().lower() in ("1", "true")
+
+# ✅ 새 방식: OpenAI()가 OPENAI_API_KEY 환경변수 자동 사용
+#    (키를 코드에서 직접 getenv로 읽지 않아도 됨)
+_client = None
+if USE_GPT_COLOR:
+    try:
+        from openai import OpenAI
+        _client = OpenAI()
+    except Exception:
+        _client = None
 
 _gpt_queue: "queue.Queue[Tuple[int, np.ndarray]]" = queue.Queue(maxsize=50)
 _stop_event = threading.Event()
@@ -92,7 +104,8 @@ def normalize_color_to_korean(raw: str) -> str:
         return "알수없음"
 
     s = str(raw).strip()
-    s = re.split(r"[,\n\.]", s, maxsplit=1)[0]
+    # 첫 줄/첫 단어만
+    s = re.split(r"[\n,\.]", s, maxsplit=1)[0]
     s = s.replace('"', "").replace("'", "").strip()
 
     if not s:
@@ -102,14 +115,12 @@ def normalize_color_to_korean(raw: str) -> str:
 
 
 # =========================
-# GPT 색상 추출
+# GPT 색상 추출 (새 방식)
 # =========================
-def extract_color_with_gpt(cv_img):
-    if not OPENAI_API_KEY:
+def extract_color_with_gpt(cv_img: np.ndarray) -> str:
+    # GPT 사용 OFF or 클라이언트 준비 실패면 종료
+    if not USE_GPT_COLOR or _client is None:
         return "알수없음"
-
-    from openai import OpenAI
-    client = OpenAI(api_key=OPENAI_API_KEY)
 
     ok, buf = cv2.imencode(".png", cv_img)
     if not ok:
@@ -119,13 +130,14 @@ def extract_color_with_gpt(cv_img):
     data_url = f"data:image/png;base64,{b64}"
 
     prompt = (
-        "이 이미지 속 물체의 대표 색상 1개를 한글로 말해줘.\n"
-        "설명 없이 JSON만 반환.\n"
+        "이 이미지 속 물체의 대표 색상 1개를 한글로만 답해줘.\n"
+        "설명 없이 JSON만 반환해.\n"
         '형식: {"color":"한글색상"}'
     )
 
     try:
-        resp = client.responses.create(
+        resp = _client.responses.create(
+            # ✅ 이미지 분석은 이 모델이 안정적
             model="gpt-4o-mini",
             input=[{
                 "role": "user",
@@ -136,8 +148,13 @@ def extract_color_with_gpt(cv_img):
             }],
         )
 
-        out = resp.output_text.strip()
-        import json
+        out = (resp.output_text or "").strip()
+
+        # 모델이 가끔 ```json ...``` 감싸면 제거
+        out = out.strip()
+        out = re.sub(r"^```(?:json)?\s*", "", out)
+        out = re.sub(r"\s*```$", "", out).strip()
+
         color = json.loads(out).get("color", "")
         return normalize_color_to_korean(color)
 
@@ -170,29 +187,33 @@ class FoundItemSubscriber(Node):
             DetectionResult, TOPIC_NAME, self.cb, 10
         )
 
-        self.get_logger().info("Listening /db_post")
+        self.get_logger().info(f"Listening {TOPIC_NAME} (DetectionResult)")
 
-        if USE_GPT_COLOR and OPENAI_API_KEY:
+        # ✅ GPT ON + OpenAI 클라이언트 준비됐을 때만 워커 시작
+        if USE_GPT_COLOR and _client is not None:
             threading.Thread(target=gpt_worker, daemon=True).start()
+            self.get_logger().info("GPT color extraction: ON")
+        else:
+            self.get_logger().info("GPT color extraction: OFF")
 
     def cb(self, msg: DetectionResult):
         try:
-            category = msg.class_name.strip()
-            robot_ns = msg.ns.strip() if msg.ns else "unknown_robot"
+            category = (msg.class_name or "").strip() or "알수없음"
+            robot_ns = (msg.ns or "").strip() or "unknown_robot"
             x, y = get_xy_from_pose(msg.pose)
 
             cv_img = _bridge.imgmsg_to_cv2(msg.image, desired_encoding="bgr8")
 
-            # 1️⃣ 먼저 INSERT → id 확보
+            # 1) 먼저 INSERT → id 확보
             item_id = insert_item_return_id(
                 category,
-                "추출중" if USE_GPT_COLOR else "알수없음",
+                "추출중" if (USE_GPT_COLOR and _client is not None) else "알수없음",
                 robot_ns,
                 x,
                 y,
             )
 
-            # 2️⃣ 이미지 파일명: item_{id}.png
+            # 2) 이미지 파일명: item_{id}.png
             filename = f"item_{item_id}.png"
             abs_path = os.path.join(UPLOAD_DIR, filename)
             cv2.imwrite(abs_path, cv_img)
@@ -200,13 +221,18 @@ class FoundItemSubscriber(Node):
             image_path = f"/static/{filename}"
             update_item_image_path(item_id, image_path)
 
-            # 3️⃣ GPT 색상 추출
-            if USE_GPT_COLOR and OPENAI_API_KEY:
-                _gpt_queue.put((item_id, cv_img))
+            # 3) GPT 색상 추출 (비동기)
+            if USE_GPT_COLOR and _client is not None:
+                try:
+                    _gpt_queue.put_nowait((item_id, cv_img))
+                except queue.Full:
+                    # 큐가 꽉 차면 색상 스킵 (콜백이 멈추지 않게)
+                    update_item_color(item_id, "알수없음")
+                    self.get_logger().warn("GPT queue full -> color skip")
             else:
                 update_item_color(item_id, "알수없음")
 
-            self.get_logger().info(f"✅ 저장 완료 id={item_id}")
+            self.get_logger().info(f"✅ 저장 완료 id={item_id}, file={filename}")
 
         except Exception as e:
             self.get_logger().error(f"❌ 실패: {e}")
