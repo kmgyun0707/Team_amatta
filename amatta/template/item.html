@@ -1,129 +1,320 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>Item Tables</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-        }
-        .container {
-            display: flex;
-            gap: 24px;
-        }
-        .table-box {
-            width: 50%;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            font-size: 13px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 6px;
-        }
-        th {
-            background: #f2f2f2;
-        }
-        h2 {
-            margin-bottom: 6px;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMATTA 관리자</title>
+
+<style>
+body{
+    margin:0;
+    font-family:"Noto Sans KR", Arial, sans-serif;
+    background:#f5f7fb;
+    color:#333;
+}
+
+/* 상단바 */
+.topbar{
+    position:relative;
+    background:#fff;
+    padding:22px 30px;
+    box-shadow:0 2px 10px rgba(0,0,0,0.05);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+.title{
+    font-size:22px;
+    font-weight:800;
+    color:#2c3e50;
+}
+
+/* 버튼 영역 오른쪽 고정 */
+.actions{
+    position:absolute;
+    right:30px;
+    display:flex;
+    gap:10px;
+}
+
+.btn{
+    padding:9px 16px;
+    border-radius:8px;
+    border:none;
+    cursor:pointer;
+    font-weight:700;
+    font-size:13px;
+    text-decoration:none;
+    display:inline-block;
+}
+
+.btn-blue{ background:#4da3ff; color:white; }
+.btn-gray{ background:#e7edf7; color:#2c3e50; }
+
+/* 레이아웃 */
+.container{
+    max-width:1300px;
+    margin:30px auto 40px;
+    padding:0 16px;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:20px;
+}
+
+@media (min-width:980px){
+    .container{
+        grid-template-columns:1fr 1fr;
+    }
+}
+
+.card{
+    background:white;
+    border-radius:12px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.05);
+    overflow:hidden;
+}
+
+.card-header{
+    padding:15px 20px;
+    border-bottom:1px solid #eee;
+    font-weight:800;
+    font-size:15px;
+    display:flex;
+    justify-content:space-between;
+}
+
+.count{
+    font-size:12px;
+    color:#888;
+    font-weight:700;
+}
+
+/* 검색 */
+.search{
+    padding:12px 20px;
+    border-bottom:1px solid #eee;
+    background:#fafcff;
+}
+
+.search input{
+    width:100%;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid #ddd;
+    font-size:13px;
+}
+
+/* 테이블 */
+.table-wrap{
+    overflow:auto;
+    max-height:620px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:13px;
+    min-width:720px;
+}
+
+th{
+    background:#f0f4fa;
+    padding:10px;
+    position:sticky;
+    top:0;
+    text-align:left;
+    border-bottom:1px solid #e9eef7;
+}
+
+td{
+    padding:10px;
+    border-bottom:1px solid #f1f3f7;
+    white-space:nowrap;
+}
+
+tr:hover{
+    background:#f9fbff;
+}
+
+/* 이미지 */
+.thumb{
+    width:50px;
+    height:50px;
+    border-radius:8px;
+    overflow:hidden;
+    border:1px solid #e8eef8;
+    background:#f7f9fd;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    color:#999;
+    font-weight:700;
+}
+
+.thumb img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
+
+/* 상태 뱃지 */
+.badge{
+    padding:5px 10px;
+    border-radius:20px;
+    font-size:11px;
+    font-weight:800;
+}
+
+.good{ background:#d4f7e8; color:#118d57; }
+.warn{ background:#fff4d6; color:#b98a00; }
+.bad { background:#ffe0e0; color:#c0392b; }
+
+.empty{
+    padding:20px;
+    color:#777;
+}
+</style>
 </head>
+
 <body>
 
-<h1>DB 테이블 현황</h1>
-<p style="color:#666">DB 경로: {{ db_path }}</p>
+<div class="topbar">
+    <div class="title">AMATTA 관리자 페이지</div>
+    <div class="actions">
+        <a href="/ad_detect" class="btn btn-blue">실시간 로봇</a>
+        <a href="{{ url_for('user_load_db.index') }}" class="btn btn-gray">Logout</a>
+    </div>
+</div>
 
 <div class="container">
 
-    <!-- item 테이블 -->
-    <div class="table-box">
-        <h2>item</h2>
-        {# Flask에서 보낸 item 리스트가 비어있지 않을 경우에만 실행 #}
-        {% if item %}
-        <table>
-            <thead>
-                <tr>
-                    {# item_cols 리스트를 반복하여 테이블 헤더(id, name 등)를 동적으로 생성 #}
-                    {% for c in item_cols %}
-                        <th>{{ c }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {# item 리스트의 각 행(row)을 반복 출력 #}
-                {% for row in item %}
-                <tr>
-                    {# 현재 행에서 각 컬럼 이름(c)에 해당하는 데이터를 출력 #}
-                    {% for c in item_cols %}
-                        <td>{{ row[c] }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-            {# DB에 데이터가 하나도 없을 경우 표시되는 문구 #}
-            <p>데이터 없음</p>
-        {% endif %}
+<!-- item 테이블 -->
+<div class="card">
+    <div class="card-header">
+        보관중인 분실물
+        <div class="count">{{ item|length if item else 0 }} rows</div>
     </div>
 
-    <!-- item_lost 테이블 -->
-    <div class="table-box">
-        <h2>item_lost</h2>
-        {# lost_item 데이터 존재 여부 확인 #}
-        {% if lost_item %}
-        <table>
-            <thead>
-                <tr>
-                    {# 분실물 테이블의 헤더 컬럼 출력 #}
-                    {% for c in lost_cols %}
-                        <th>{{ c }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in lost_item %}
-                <tr>
-                    {# 각 행의 데이터들을 컬럼 순서에 맞게 출력 #}
-                    {% for c in lost_cols %}
-                        <td>{{ row[c] }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-            <p>데이터 없음</p>
-        {% endif %}
+    <div class="search">
+        <input id="searchItem" placeholder="검색어 입력">
+    </div>
+
+    <div class="table-wrap">
+    {% if item %}
+    <table id="tableItem">
+        <thead>
+        <tr>
+            <th>image</th>
+            {% for c in item_cols %}
+                {% if c != 'image_path' %}
+                    <th>{{ c }}</th>
+                {% endif %}
+            {% endfor %}
+        </tr>
+        </thead>
+
+        <tbody>
+        {% for row in item %}
+        <tr>
+            <td>
+            {% set p = row.get('image_path') %}
+            {% if p %}
+                {% set fname = p.split('/')[-1] %}
+                <div class="thumb">
+                    <img src="{{ url_for('static', filename=fname) }}"
+                         onerror="this.remove(); this.parentElement.innerHTML='이미지 없음';">
+                </div>
+            {% else %}
+                <div class="thumb">이미지 없음</div>
+            {% endif %}
+            </td>
+
+            {% for c in item_cols %}
+                {% if c != 'image_path' %}
+                    {% if c == 'state' %}
+                        {% set s = row.get(c) %}
+                        {% set cls = 'good' if s in ['보관중','회수','완료'] else ('warn' if s in ['탐색중','이동중'] else 'bad') %}
+                        <td><span class="badge {{ cls }}">{{ s }}</span></td>
+                    {% else %}
+                        <td>{{ row.get(c) }}</td>
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty">데이터 없음</div>
+    {% endif %}
     </div>
 </div>
-<div style="margin-top: 32px; text-align: center;">
-    {# 실시간 로봇 현황 페이지(/ad_detect)로 이동 #}
-    <a href="/ad_detect">
-        <button style="
-            padding: 12px 24px;
-            font-size: 15px;
-            cursor: pointer;
-        ">
-            실시간 로봇
-        </button>
-    </a>
-    {# 로그아웃 클릭 시 사용자용 분실물 확인 페이지(index 함수)로 이동 #}
-    {# 'user_load_db' 블루프린트 내의 'index' 함수를 호출하는 방식 #}
-    <a href="{{ url_for('user_load_db.index') }}">
-        <button style="
-            padding: 12px 24px;
-            font-size: 15px;
-            cursor: pointer;
-        ">
-            logout
-        </button>
-    </a>
+
+
+<!-- item_lost 테이블 -->
+<div class="card">
+    <div class="card-header">
+        사용자 등록 분실물
+        <div class="count">{{ lost_item|length if lost_item else 0 }} rows</div>
+    </div>
+
+    <div class="search">
+        <input id="searchLost" placeholder="검색어 입력">
+    </div>
+
+    <div class="table-wrap">
+    {% if lost_item %}
+    <table id="tableLost">
+        <thead>
+        <tr>
+            {% for c in lost_cols %}
+                <th>{{ c }}</th>
+            {% endfor %}
+        </tr>
+        </thead>
+
+        <tbody>
+        {% for row in lost_item %}
+        <tr>
+            {% for c in lost_cols %}
+                {% if c == 'state' %}
+                    {% set s = row.get(c) %}
+                    {% set cls = 'good' if s in ['회수','완료'] else ('warn' if s in ['탐색중','이동중'] else 'bad') %}
+                    <td><span class="badge {{ cls }}">{{ s }}</span></td>
+                {% else %}
+                    <td>{{ row.get(c) }}</td>
+                {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+        <div class="empty">데이터 없음</div>
+    {% endif %}
+    </div>
 </div>
+
+</div>
+
+<script>
+function attachFilter(inputId, tableId){
+    const input = document.getElementById(inputId);
+    const table = document.getElementById(tableId);
+    if(!input || !table) return;
+
+    input.addEventListener("input", function(){
+        const q = this.value.toLowerCase();
+        table.querySelectorAll("tbody tr").forEach(tr=>{
+            tr.style.display = tr.innerText.toLowerCase().includes(q) ? "" : "none";
+        });
+    });
+}
+attachFilter("searchItem","tableItem");
+attachFilter("searchLost","tableLost");
+</script>
 
 </body>
 </html>

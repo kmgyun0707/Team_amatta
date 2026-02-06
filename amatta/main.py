@@ -9,7 +9,7 @@ from web.user_load_db import user_load_db_bp
 from web.lost_report import lost_report_bp
 from web.guide_start import guide_start_bp
 from web.search_start import search_start_bp 
-from web.found_item_listener import main
+# from web.found_item_listener import main
 
 
 BASE_DIR = "/home/rokey/Desktop/amatta"   # 너 프로젝트 루트
@@ -38,5 +38,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    threading.Thread(target=main, daemon=True).start()
+    # threading.Thread(target=main, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)  # 5000port에서 열림

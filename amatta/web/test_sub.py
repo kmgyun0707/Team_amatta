@@ -10,11 +10,14 @@ class MinimalSubscriber(Node):
         # 1. Raw 이미지 구독 시도 (Reliable 10)
         self.create_subscription(
             Image, 
-            '/robot3/oakd/rgb/image_raw', 
+            '/camera/color/image_raw', 
             self.listener_callback, 
             10
         )
         
+        #/camera/color/image_raw
+        # /robot3/oakd/rgb/image_raw'
+
         # 2. 혹시 모르니 Best Effort로도 구독 시도
         self.create_subscription(
             Image, 
