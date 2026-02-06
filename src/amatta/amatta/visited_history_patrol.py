@@ -37,10 +37,11 @@ class VisitedHistoryPatrol(Node):
         self.visited_spot = []          # 이동할 경로 리스트
         self.registered = False         # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
-        self.is_detected = False        # 분실물을 인지했는지 여부
+        self.detected_robot3 = False        # 분실물을 인지했는지 여부
+        self.detected_robot1 = False
         self.current_pose = None 
         
-        ns =self.get_namespace
+        ns =self.get_namespace()
 
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
@@ -69,18 +70,32 @@ class VisitedHistoryPatrol(Node):
         )
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
-        self.detection_sub = self.create_subscription(
+        self.detection_robot1_sub = self.create_subscription(
             DetectionInfo,
-            f'{ns}/is_detected',
-            self.detection_callback,
+            '/robot1/is_detected',
+            self.detection_robot1_callback,
             10,
             callback_group=self.callback_group
         )
+        self.detection_robot3_sub = self.create_subscription(
+            DetectionInfo,
+            '/robot3/is_detected',
+            self.detection_robot3_callback,
+            10,
+            callback_group=self.callback_group)
 
         # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
             f'{ns}/cmd_vel',
+            10,
+            callback_group=self.callback_group
+        )
+
+        # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
+        self.is_found_pub = self.navigator.create_publisher(
+            Bool,
+            f'{ns}/is_found',
             10,
             callback_group=self.callback_group
         )
@@ -151,9 +166,12 @@ class VisitedHistoryPatrol(Node):
         self.current_pose.pose = msg.pose.pose
     
     # 분실물을 발견했는지 실시간 저장
-    def detection_callback(self, msg):
-        self.is_detected = msg.detected
+    def detection_robot1_callback(self, msg):
+        self.detected_robot1 = msg.detected
         self.goal = msg.goal
+
+    def detection_robot3_callback(self, msg):
+        self.detected_robot3 = msg.detected
 
     # x,y,방향 값을 받아 PostStamped 형식으로 변환
     def create_pose(self, x, y, z_orient, w_orient):
@@ -267,18 +285,27 @@ class VisitedHistoryPatrol(Node):
             self.navigator.info(f'Retracing path to {target_name}...')
             self.navigator.startToPose(target_pose)
 
-            self.get_logger().info("11111111111111111*****")
             while not self.navigator.isTaskComplete():      # 로봇이 이동 중일 때 인지 여부 확인
-                # 주행 중에도 실시간 센서/위치 데이터를 업데이트하기 위해 호출
-                self.get_logger().info("222222222222222*****")
-                rclpy.spin_once(self, timeout_sec=0.01)
-                self.get_logger().info("333333333333333333333*****")
-                # 분실물 인지 시 stop
-                if self.is_detected:
-                    self.get_logger().info("in is_detected*****")
+
+                # 다른 로봇이 분실물 인지했을 경우, 정지 후 코드 종료
+                if self.detected_robot3:
+                    self.get_logger().info("robot3 detected")
                     self.navigator.cancelTask()
-                    self.get_logger().info("nect cancelTask*****")
+                    self.stop_robot()    
+                    return
+                
+                # 자신이 분실물 인지했을 경우, 정지 후 접근 및 게이트로 이동
+                if self.detected_robot1:
+                    self.get_logger().info("robot1 detected")
+                    self.navigator.cancelTask()
                     self.stop_robot()       # 추후 접근으로 구현 필요
+                    time.sleep(5.0)
+                    # 게이트로 이동
+                    self.get_logger().info(f'go to {gate_name}')
+                    self.navigator.startToPose(gate_pose)
+
+                    while not self.navigator.isTaskComplete():
+                        time.sleep(0.1)
                     return
                 time.sleep(0.1)
 
@@ -287,20 +314,19 @@ class VisitedHistoryPatrol(Node):
             if result == TaskResult.SUCCEEDED:
                 self.navigator.info(f'Checked {target_name} (Visited Spot).')
                 time.sleep(1.0)
-
-                # 게이트로 이동
-                self.get_logger().info(f'go to {gate_name}')
-                self.navigator.startToPose(gate_pose)
-
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to {target_name} was canceled.')
             elif result == TaskResult.FAILED:
                 self.navigator.error(f'Failed to reach {target_name}.')
 
         # 탐색 완료했는데도 분실물을 발견하지 못한 경우 DB 업로드 (추후 추가 예정)
-        if not self.is_detected:
+        if not self.detected_robot1 and not self.detected_robot3:
             self.navigator.info('DB Upload')
+
             # /is_found (Bool) 토픽 False로 퍼블리시
+            msg_is_found = Bool()
+            msg_is_found.data = False
+            self.is_found_pub.publish(msg_is_found)
 
         self.navigator.info('History check completed. Returning to dock...')
 
@@ -327,7 +353,7 @@ def main(args=None):
                 tracer.search_mode = False 
                 # 탐색이 끝나면 프로그램 종료
                 break 
-                
+            
     except KeyboardInterrupt:
         pass
     finally:

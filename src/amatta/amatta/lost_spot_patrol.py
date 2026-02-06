@@ -38,11 +38,12 @@ class LostItemPatrol(Node):
         self.visited_spot = []          # 이동할 경로 리스트
         self.registered = False   # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
-        self.is_detected = False        # 분실물을 인지했는지 여부
+        self.detected_robot3 = False        # 분실물을 인지했는지 여부
+        self.detected_robot1 = False
         self.robot1_pose = None
         self.robot2_pose = None
         self.current_pose = None        # 로봇의 현재 위치값
-        ns =self.get_namespace
+        ns =self.get_namespace()
 
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
@@ -66,6 +67,14 @@ class LostItemPatrol(Node):
             f'{ns}/cmd_vel',
             10,
             callback_group=self.callback_group)
+        
+        # 로봇 3의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
+        self.is_found_pub = self.navigator.create_publisher(
+            Bool,
+            f'{ns}/is_found',
+            10,
+            callback_group=self.callback_group
+        )
 
         # 로봇 1,2의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
         self.robot1_sub = self.create_subscription(
@@ -83,13 +92,19 @@ class LostItemPatrol(Node):
             callback_group=self.callback_group)
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
-        self.detection_sub = self.create_subscription(
+        self.detection_robot3_sub = self.create_subscription(
             DetectionInfo,
-            f'{ns}/is_detected',
-            self.detection_callback,
+            '/robot3/is_detected',
+            self.detection_robot3_callback,
             10,
             callback_group=self.callback_group)
         
+        self.detection_robot1_sub = self.create_subscription(
+            DetectionInfo,
+            '/robot1/is_detected',
+            self.detection_robot1_callback,
+            10,
+            callback_group=self.callback_group)
 
         # 목표 지점 정의 (robot 3 좌표 기준)
         self.goal_options = [
@@ -179,8 +194,11 @@ class LostItemPatrol(Node):
         self.robot2_pose = msg.pose.pose
     
     # 분실물을 발견했는지 실시간 저장
-    def detection_callback(self, msg):
-        self.is_detected = msg.detected
+    def detection_robot1_callback(self, msg):
+        self.detected_robot1 = msg.detected
+        
+    def detection_robot3_callback(self, msg):
+        self.detected_robot3 = msg.detected
         self.goal = msg.goal
     
     # 로봇1이 얼마나 가까이에 있는지 확인
@@ -306,11 +324,28 @@ class LostItemPatrol(Node):
 
             while not self.navigator.isTaskComplete():
 
-                # 분실물 발견 시 정지
-                if self.is_detected:
+                # 다른 로봇이 분실물 인지했을 경우, 정지 후 코드 종료
+                if self.detected_robot1:
+                    self.get_logger().info("robot1 detected")
+                    self.navigator.cancelTask()
+                    self.stop_robot()    
+                    return
+                
+                # 자신이 분실물 인지했을 경우, 정지 후 접근 및 게이트로 이동
+                if self.detected_robot3:
+                    self.get_logger().info("robot3 detected")
                     self.navigator.cancelTask()
                     self.stop_robot()       # 추후 접근으로 구현 필요
+                    time.sleep(5.0)
+                    # 게이트로 이동
+                    self.get_logger().info(f'go to {gate_name}')
+                    self.navigator.startToPose(gate_pose)
+
+                    while not self.navigator.isTaskComplete():
+                        time.sleep(0.1)
                     return
+                time.sleep(0.1)
+
 
                 # 로봇1,2간의 거리가 1미터 이내 일때
                 if self.is_robot1_nearby(1.0):
@@ -342,9 +377,14 @@ class LostItemPatrol(Node):
                 self.navigator.error(f'Failed to reach {target_name}.')
 
         # 분실물이 발견이 되면 DB 업로드 (추후 추가 예정)
-        if not self.is_detected:
+        if not self.detected_robot1 and not self.detected_robot3:
             self.navigator.info('DB Upload')
+
             # /is_found (Bool) 토픽 False로 퍼블리시
+            msg_is_found = Bool()
+            msg_is_found.data = False
+            self.is_found_pub.publish(msg_is_found)
+
         self.navigator.info('All tasks completed. Returning to dock...')
 
 def main(args=None):

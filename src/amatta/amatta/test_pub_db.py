@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from airport_guide_interfaces.msg import DbInfo
-import sys
+from std_msgs.msg import Int32MultiArray
 
 class DbPublisher(Node):
     def __init__(self):
@@ -24,6 +24,17 @@ class DbPublisher(Node):
                     msg.registered = True
                 elif user_input == '0':
                     msg.registered = False
+
+                    user_input = input("\n방문한 장소 입력 > ")
+                    # 입력받은 문자열을 정수 리스트로 변환
+                    data_list = [int(x) for x in user_input.split()]
+                    
+                    # 메시지 생성 및 데이터 할당
+                    msg = Int32MultiArray()
+                    msg.visited_spots = data_list
+                    
+                    user_input_gate = input("\n방문할 게이트 입력 > ")
+                    msg.gate_id = int(user_input_gate)
                 else:
                     print("잘못된 입력입니다. 1 또는 0을 입력하세요.")
                     continue

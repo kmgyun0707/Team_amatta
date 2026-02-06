@@ -90,10 +90,12 @@ class GuideToInfo(Node):
             self.get_logger().info(f'Guide to Counter...')
             self.handle_registration = True
             self.navigator.startToPose(self.target_pose[0]['pose'])
+
             while not self.navigator.isTaskComplete():
                 if not rclpy.ok(): 
                     return
                 time.sleep(0.1)
+
             result = self.navigator.getResult()# 이 경우에만 코드 종료되도록 수정 필요
             if result == TaskResult.SUCCEEDED:      
                 self.navigator.info(f'Arrived at entrance!')
