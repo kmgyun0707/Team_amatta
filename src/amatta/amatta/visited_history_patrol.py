@@ -15,6 +15,8 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 import threading
 
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+
 
 # INPUTS (topics):
 # - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
@@ -43,6 +45,16 @@ class VisitedHistoryPatrol(Node):
         
         ns =self.get_namespace()
 
+        # [2] BEST_EFFORT 설정 정의 (핵심)
+        # - Reliability: BEST_EFFORT (전송 속도 우선, 유실 허용)
+        # - History: KEEP_LAST (최신 데이터 유지를 위해 필수)
+        # - Depth: 10 (버퍼 크기)
+        qos_best_effort = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
@@ -65,15 +77,15 @@ class VisitedHistoryPatrol(Node):
             PoseWithCovarianceStamped,
             f'{ns}/amcl_pose',
             self.pose_callback,
-            10,
+            qos_best_effort,
             callback_group=self.callback_group
         )
 
         ## 로봇1의 좌표 발행
         self.robot1_pose_pub = self.create_publisher(
             Pose, 
-            'robot1/simple_pose', 
-            10
+            '/robot1/simple_pose', 
+            qos_best_effort
         )
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
@@ -105,7 +117,7 @@ class VisitedHistoryPatrol(Node):
             10,
             callback_group=self.callback_group
         )
-        
+        # self.timer = self.create_timer(0.5, self.timer_callback)
         # 목표 지점 정의 (robot 1 좌표 기준)
         self.goal_options = [
             # 0 입구 (Entrance)
@@ -171,8 +183,15 @@ class VisitedHistoryPatrol(Node):
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
-        self.robot1_pose_pub.publish(self.current_pose.pose)
-    
+        if self.current_pose is not None:
+            self.get_logger().info(f"Pose Received!")
+            self.robot1_pose_pub.publish(self.current_pose.pose)
+
+    # def timer_callback(self): 
+    #     if self.current_pose is None:
+    #         return
+    #     self.robot1_pose_pub.publish(self.current_pose.pose)
+
     # 분실물을 발견했는지 실시간 저장
     def detection_robot1_callback(self, msg):
         self.detected_robot1 = msg.detected

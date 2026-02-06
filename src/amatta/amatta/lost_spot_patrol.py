@@ -79,7 +79,7 @@ class LostItemPatrol(Node):
         #### 로봇1 좌표만 구독
         self.robot1_sub= self.create_subscription(
             Pose,
-            'robot1/simple_pose',
+            '/robot1/simple_pose',
             self.robot1_pose_callback,
             10,
             callback_group=self.callback_group
