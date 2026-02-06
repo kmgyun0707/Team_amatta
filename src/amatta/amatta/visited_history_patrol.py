@@ -6,14 +6,15 @@ import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist
 from nav2_simple_commander.robot_navigator import TaskResult
-from std_msgs.msg import Int32MultiArray,Bool
-from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
+from airport_guide_interfaces.msg import DbInfo,DetectionInfo
 
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 import threading
+
 
 # INPUTS (topics):
 # - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
@@ -34,23 +35,25 @@ class VisitedHistoryPatrol(Node):
 
         # 토픽 수신 여부와 데이터를 저장할 변수 초기화
         self.visited_spot = []          # 이동할 경로 리스트
-        self.is_data_received = False   # db로부터 토픽을 수신했는지 여부
+        self.registered = False         # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
         self.is_detected = False        # 분실물을 인지했는지 여부
         self.current_pose = None 
+        
+        ns =self.get_namespace
 
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
-            '/search_mode',
+            f'{ns}/search_mode',
             self.search_mode_callback,
             10,
             callback_group=self.callback_group)
         
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
-            Int32MultiArray,
-            '/visited_spot',
+            DbInfo,
+            f'{ns}/is_registered',
             self.topic_callback,
             10,
             callback_group=self.callback_group
@@ -59,7 +62,7 @@ class VisitedHistoryPatrol(Node):
         # 로봇 1의 현재 위치 구독 -> 경로 생성 사용
         self.subscription_pose = self.create_subscription(
             PoseWithCovarianceStamped,
-            '/robot1/amcl_pose',
+            f'{ns}/amcl_pose',
             self.pose_callback,
             10,
             callback_group=self.callback_group
@@ -67,8 +70,8 @@ class VisitedHistoryPatrol(Node):
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
         self.detection_sub = self.create_subscription(
-            Bool,
-            '/is_detected',
+            DetectionInfo,
+            f'{ns}/is_detected',
             self.detection_callback,
             10,
             callback_group=self.callback_group
@@ -77,7 +80,7 @@ class VisitedHistoryPatrol(Node):
         # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
-            '/robot1/cmd_vel',
+            f'{ns}/cmd_vel',
             10,
             callback_group=self.callback_group
         )
@@ -136,9 +139,10 @@ class VisitedHistoryPatrol(Node):
             
     # visited_spot 토픽이 들어오면 실행 / 사용자 이동 내역을 리스트 형태로 저장
     def topic_callback(self, msg):
-        self.get_logger().info(f"Topic Received! Data: {msg.data}")
-        self.visited_spot= list(msg.data)
-        self.is_data_received = True
+        self.get_logger().info(f"Topic Received! Data: {msg.visited_spots}")
+        self.visited_spot= list(msg.visited_spots)
+        self.gate_id = msg.gate_id - 8      # 게이트 1, 2이 8, 9로 들어오기 때문에 gate_options 인덱스에 맞게 빼줌
+        self.registered = msg.registered
 
     # amcl_pose토픽에서 좌표와 방향만 필요하기 때문에 PoseStamped 규격으로 필요한 정보만 저장
     def pose_callback(self, msg):
@@ -148,7 +152,8 @@ class VisitedHistoryPatrol(Node):
     
     # 분실물을 발견했는지 실시간 저장
     def detection_callback(self, msg):
-        self.is_detected = msg.data
+        self.is_detected = msg.detected
+        self.goal = msg.goal
 
     # x,y,방향 값을 받아 PostStamped 형식으로 변환
     def create_pose(self, x, y, z_orient, w_orient):
@@ -256,6 +261,9 @@ class VisitedHistoryPatrol(Node):
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
 
+            gate_name = self.gate_options[self.gate_id]['name']
+            gate_pose = self.gate_options[self.gate_id]['pose']
+
             self.navigator.info(f'Retracing path to {target_name}...')
             self.navigator.startToPose(target_pose)
 
@@ -278,7 +286,12 @@ class VisitedHistoryPatrol(Node):
             result = self.navigator.getResult()
             if result == TaskResult.SUCCEEDED:
                 self.navigator.info(f'Checked {target_name} (Visited Spot).')
-                time.sleep(2.0)
+                time.sleep(1.0)
+
+                # 게이트로 이동
+                self.get_logger().info(f'go to {gate_name}')
+                self.navigator.startToPose(gate_pose)
+
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to {target_name} was canceled.')
             elif result == TaskResult.FAILED:
@@ -308,10 +321,9 @@ def main(args=None):
     try:
         while rclpy.ok():
             # 데이터를 받으면 순찰 시작
-            if tracer.search_mode and tracer.is_data_received:
+            if tracer.search_mode and tracer.registered:
                 tracer.run_patrol()
-                tracer.is_data_received = False 
-                tracer.is_data_received = False 
+                tracer.registered = False 
                 tracer.search_mode = False 
                 # 탐색이 끝나면 프로그램 종료
                 break 

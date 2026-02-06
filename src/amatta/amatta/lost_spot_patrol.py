@@ -6,10 +6,11 @@ import time
 import math
 import itertools
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped,Twist
 from nav2_simple_commander.robot_navigator import TaskResult
-from std_msgs.msg import Int32MultiArray, Bool
-from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
+from airport_guide_interfaces.msg import DbInfo,DetectionInfo
+
 # Multi Thread
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
@@ -35,17 +36,18 @@ class LostItemPatrol(Node):
 
         # 토픽 수신 여부와 데이터를 저장할 변수 초기화
         self.visited_spot = []          # 이동할 경로 리스트
-        self.is_data_received = False   # db로부터 토픽을 수신했는지 여부
+        self.registered = False   # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
         self.is_detected = False        # 분실물을 인지했는지 여부
         self.robot1_pose = None
         self.robot2_pose = None
         self.current_pose = None        # 로봇의 현재 위치값
+        ns =self.get_namespace
 
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
-            Int32MultiArray,
-            '/visited_spot',
+            DbInfo,
+            f'{ns}/is_registered',
             self.topic_callback,
             10,
             callback_group=self.callback_group)
@@ -53,7 +55,7 @@ class LostItemPatrol(Node):
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
-            '/search_mode',
+            f'{ns}/search_mode',
             self.search_mode_callback,
             10,
             callback_group=self.callback_group)
@@ -61,7 +63,7 @@ class LostItemPatrol(Node):
         # 로봇 3의 속도를 제어하기 위해 로봇의 /cmd_vel 발행
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
-            '/robot3/cmd_vel',
+            f'{ns}/cmd_vel',
             10,
             callback_group=self.callback_group)
 
@@ -82,8 +84,8 @@ class LostItemPatrol(Node):
 
         # 분실물이 감지 되었는지 Bool 값 토픽 구독
         self.detection_sub = self.create_subscription(
-            Bool,
-            '/is_detected',
+            DetectionInfo,
+            f'{ns}/is_detected',
             self.detection_callback,
             10,
             callback_group=self.callback_group)
@@ -157,9 +159,10 @@ class LostItemPatrol(Node):
     # visited_spot 토픽이 들어오면 실행 사용자 이동 내역을 리스트 형태로 저장
     ################ 추후 DBInfo Sub으로 수정 필요 ###################
     def topic_callback(self, msg):
-        self.get_logger().info(f"Topic Received! Data: {msg.data}")
-        self.visited_spot_raw = list(msg.data)
-        self.is_data_received = True
+        self.get_logger().info(f"Topic Received! Data: {msg.visited_spots}")
+        self.visited_spot_raw = list(msg.visited_spots)
+        self.gate_id = msg.gate_id - 8      # 게이트 1, 2이 8, 9로 들어오기 때문에 gate_options 인덱스에 맞게 빼줌
+        self.registered = msg.registered
 
     # 로봇 1 : amcl 토픽중 좌표와 방향만 저장
     def robot1_pose_callback(self, msg):
@@ -177,7 +180,8 @@ class LostItemPatrol(Node):
     
     # 분실물을 발견했는지 실시간 저장
     def detection_callback(self, msg):
-        self.is_detected = msg.data
+        self.is_detected = msg.detected
+        self.goal = msg.goal
     
     # 로봇1이 얼마나 가까이에 있는지 확인
     def is_robot1_nearby(self, threshold=1.0):      # threshold: 안전 거리
@@ -289,6 +293,9 @@ class LostItemPatrol(Node):
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
 
+            gate_name = self.gate_options[self.gate_id]['name']
+            gate_pose = self.gate_options[self.gate_id]['pose']
+
             # 로봇 1이 로봇2와의 거리가 1.5미터 이내면 대기
             while self.is_robot1_nearby(1.5):
                 self.navigator.info("Robot 1 is too close! Waiting...")
@@ -324,6 +331,11 @@ class LostItemPatrol(Node):
             if result == TaskResult.SUCCEEDED:
                 self.navigator.info(f'Arrived at {target_name}!')
                 time.sleep(1.0)
+
+                # 게이트로 이동
+                self.get_logger().info(f'go to {gate_name}')
+                self.navigator.startToPose(gate_pose)
+
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to {target_name} was canceled.')
             elif result == TaskResult.FAILED:
@@ -332,7 +344,7 @@ class LostItemPatrol(Node):
         # 분실물이 발견이 되면 DB 업로드 (추후 추가 예정)
         if not self.is_detected:
             self.navigator.info('DB Upload')
-
+            # /is_found (Bool) 토픽 False로 퍼블리시
         self.navigator.info('All tasks completed. Returning to dock...')
 
 def main(args=None):
@@ -352,16 +364,15 @@ def main(args=None):
     try:
         patrol_robot.get_logger().info("Main Loop Started. Waiting for command...")
         while rclpy.ok():
-            patrol_robot.get_logger().info(f'search mode: {patrol_robot.search_mode}, spot: {patrol_robot.is_data_received}')
+            patrol_robot.get_logger().info(f'search mode: {patrol_robot.search_mode}')
             
             # Guide 노드로부터 search mode 받고, DB로부터 사용자 이동 경로 받으면 탐색 시작
-            if patrol_robot.search_mode and patrol_robot.is_data_received:
+            if patrol_robot.search_mode and patrol_robot.registered:
                 patrol_robot.run_patrol()
 
 
-                patrol_robot.is_data_received = False 
+                patrol_robot.registered = False 
                 # 탐색이 끝나면 프로그램 종료
-                patrol_robot.is_data_received = False 
                 patrol_robot.search_mode = False 
                 patrol_robot.get_logger().info("Patrol finished. Waiting for next command or Exit.")
                 break   # 한 번만 하고 끌거면 break 사용
