@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>탐색 시작</title>
+  <style>
+    body { font-family: sans-serif; background:#f6f7fb; margin:0; }
+    .wrap {
+      width: 420px;
+      margin: 80px auto;
+      background: white;
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+    .msg { font-size: 18px; font-weight: 800; margin: 8px 0; }
+    .sub { font-size: 13px; color:#666; margin-top: 8px; }
+    .idbox { margin-top: 14px; font-size: 13px; color:#333; background:#f2f2f2; padding:10px; border-radius:12px; }
+    .btn {
+      width: 100%;
+      margin-top: 18px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: #4f46e5;
+      color: white;
+      cursor: pointer;
+    }
+    .btn2 { background:#eee; color:#000; }
+  </style>
+</head>
+<body>
+  <div class="wrap" data-lost-id="{{ lost_id }}">
+    <div class="msg">분실물 탐색을 시작합니다</div>
+    <div class="sub">로봇이 방문 경로를 따라 이동하며 분실물을 탐색합니다.</div>
+
+    <div class="idbox">
+      신고 ID: {{ lost_id if lost_id else "N/A" }}
+    </div>
+
+    <button class="btn" onclick="location.href='/'">목록으로 돌아가기</button>
+    <button class="btn btn2" onclick="history.back()">이전으로</button>
+  </div>
+  <script>
+    const wrap = document.querySelector(".wrap");
+    const lostIdRaw = wrap?.dataset?.lostId;
+    const lostId = lostIdRaw ? Number(lostIdRaw) : null;
+
+    async function poll() {
+      if (lostId === null || Number.isNaN(lostId)) return;
+
+      try {
+        const res = await fetch(`/search_status?lost_id=${lostId}`);
+        const data = await res.json();
+
+        if (!data.ok) return;
+
+        if (data.state === "회수") {
+          location.href = `/search_success?lost_id=${lostId}`;
+        } else if (data.state === "분실") {
+          location.href = `/search_fail?lost_id=${lostId}`;
+        }
+      } catch (e) {
+        // 네트워크 에러 무시
+      }
+    }
+
+    setInterval(poll, 1500);
+    poll();
+  </script>
+</body>
+</html>

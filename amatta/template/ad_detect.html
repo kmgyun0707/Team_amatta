@@ -1,73 +1,167 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <title>AMR Monitoring - Admin</title>
-    <script src="https://cdn.jsdelivr.net/npm/roslib@1/build/roslib.min.js"></script>
-    <style>
-        .container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        .monitor-box { border: 2px solid #333; border-radius: 10px; overflow: hidden; background: #000; }
-        .info-panel { margin-top: 20px; width: 640px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .card { background: #f4f4f4; padding: 15px; border-radius: 8px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }
-        .data { font-weight: bold; color: #007bff; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Robot Monitor</title>
+  <style>
+    body { font-family: sans-serif; background-color: #f4f4f9; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+    h1 { text-align: center; color: #333; }
+
+    /* 네비게이션 */
+    .nav-bar { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+    .nav-btn { padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background-color: #e9ecef; transition: 0.3s; }
+    .nav-btn.active { background-color: #007bff; color: white; }
+
+    /* 패널 */
+    .view-panel { display: none; text-align: center; }
+    .view-panel.active { display: block; }
+
+    /* 영상 및 상태창 */
+    .video-frame { width: 100%; max-width: 640px; height: 480px; background-color: #000; border-radius: 8px; object-fit: contain; }
+    
+    /* ✅ 디버깅용 상태 박스 스타일 */
+    .debug-box {
+        margin-top: 15px; padding: 10px; border-radius: 8px; background: #333; color: #0f0;
+        font-family: monospace; font-size: 14px; text-align: left; display: inline-block; width: 90%; max-width: 600px;
+    }
+    .status-ok { color: #00ff00; font-weight: bold; }
+    .status-fail { color: #ff3333; font-weight: bold; }
+
+    /* 지도 관련 */
+    .map-container { position: relative; display: inline-block; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+    #mapImg { display: block; max-width: 100%; }
+    #mapCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AMR 실시간 모니터링</h1>
 
-        <div class="monitor-box">
-            <img src="http://{{ robot_ip }}:8080/stream?topic=/camera/image_raw" 
-                 alt="AMR Camera Stream" width="640" height="480">
-        </div>
+<div class="container">
+  <h1>🤖 Robot Control Center</h1>
 
-        <div class="info-panel">
-            <div class="card">
-                <h3>배터리 상태</h3>
-                <p><span id="battery" class="data">--</span> %</p>
-            </div>
-            <div class="card">
-                <h3>현재 위치 (Pose)</h3>
-                <p>X: <span id="pos-x" class="data">0.00</span></p>
-                <p>Y: <span id="pos-y" class="data">0.00</span></p>
-            </div>
-        </div>
+  <div class="nav-bar">
+    <button class="nav-btn active" onclick="switchTab('map-view', this)">📍 Robot Map</button>
+    <button class="nav-btn" onclick="switchTab('cam-robot1', this)">📷 Robot 1 Cam</button>
+    <button class="nav-btn" onclick="switchTab('cam-robot3', this)">📷 Robot 3 Cam</button>
+    <a href="{{ url_for('ad_load_db.ad_load_db') }}" style="margin-left:auto;">
+      <button class="nav-btn" style="background:#28a745; color:white;">DB Logs</button>
+    </a>
+  </div>
+
+  <div id="map-view" class="view-panel active">
+    <h3>실시간 위치</h3>
+    <div class="map-container">
+      <img id="mapImg" src="{{ map_image_url }}" alt="Map Loading...">
+      <canvas id="mapCanvas"></canvas>
     </div>
+  </div>
 
-    <script>
-        // Rosbridge 연결 설정
-        const ros = new ROSLIB.Ros({
-            url: 'ws://{{ robot_ip }}:9090'
-        });
+  <div id="cam-robot1" class="view-panel">
+    <h3>Robot 1 : YOLO Tracking</h3>
+    <img class="video-frame" src="/ad_detect/video_feed/robot1" onerror="this.src='https://via.placeholder.com/640x480?text=No+Signal'">
+    <div class="debug-box">
+        <div>STATUS: <span id="r1-status" class="status-fail">Waiting...</span></div>
+        <div>Resolution: <span id="r1-size">-</span></div>
+        <div>Last Packet: <span id="r1-ago">-</span> sec ago</div>
+        <div>Total Frames: <span id="r1-count">0</span></div>
+    </div>
+  </div>
 
-        // 연결 확인
-        ros.on('connection', () => { console.log('Connected to websocket server.'); });
-        ros.on('error', (error) => { console.log('Error connecting to websocket server: ', error); });
+  <div id="cam-robot3" class="view-panel">
+    <h3>Robot 3 : YOLO Tracking</h3>
+    <img class="video-frame" src="/ad_detect/video_feed/robot3" onerror="this.src='https://via.placeholder.com/640x480?text=No+Signal'">
+    <div class="debug-box">
+        <div>STATUS: <span id="r3-status" class="status-fail">Waiting...</span></div>
+        <div>Resolution: <span id="r3-size">-</span></div>
+        <div>Last Packet: <span id="r3-ago">-</span> sec ago</div>
+        <div>Total Frames: <span id="r3-count">0</span></div>
+    </div>
+  </div>
+</div>
 
-        // 배터리 데이터 구독 (Topic 이름은 로봇 환경에 맞춰 수정하세요)
-        const batterySub = new ROSLIB.Topic({
-            ros : ros,
-            name : '/battery_state',
-            messageType : 'sensor_msgs/BatteryState'
-        });
+<div id="map-meta" data-resolution='{{ map_resolution | tojson }}' data-origin='{{ map_origin | tojson }}'></div>
 
-        batterySub.subscribe((message) => {
-            // 배터리 비율(0.0~1.0)을 퍼센트로 표시
-            document.getElementById('battery').innerText = (message.percentage * 100).toFixed(1);
-        });
+<script>
+  // 1. 탭 전환
+  function switchTab(panelId, btn) {
+    document.querySelectorAll('.view-panel').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(panelId).classList.add('active');
+    btn.classList.add('active');
+    if(panelId === 'map-view') resizeCanvas();
+  }
 
-        // 로봇 좌표 구독 (Nav2 사용 시 /amcl_pose 또는 /odom)
-        const poseSub = new ROSLIB.Topic({
-            ros : ros,
-            name : '/amcl_pose',
-            messageType : 'geometry_msgs/PoseWithCovarianceStamped'
-        });
+  // 2. 지도 및 좌표 로직
+  const meta = document.getElementById("map-meta");
+  const MAP_RES = JSON.parse(meta.dataset.resolution);
+  const MAP_ORIGIN = JSON.parse(meta.dataset.origin);
+  const img = document.getElementById("mapImg");
+  const canvas = document.getElementById("mapCanvas");
+  const ctx = canvas.getContext("2d");
 
-        poseSub.subscribe((message) => {
-            const pose = message.pose.pose.position;
-            document.getElementById('pos-x').innerText = pose.x.toFixed(2);
-            document.getElementById('pos-y').innerText = pose.y.toFixed(2);
-        });
-    </script>
+  function resizeCanvas() {
+    if (img.clientWidth === 0) return;
+    canvas.width = img.clientWidth;
+    canvas.height = img.clientHeight;
+  }
+  function mapToPixel(x, y) {
+    const originX = MAP_ORIGIN[0];
+    const originY = MAP_ORIGIN[1];
+    const rawPx = (x - originX) / MAP_RES;
+    const rawPy = (img.naturalHeight) - ((y - originY) / MAP_RES);
+    const scaleX = canvas.width / img.naturalWidth;
+    const scaleY = canvas.height / img.naturalHeight;
+    return { x: rawPx * scaleX, y: rawPy * scaleY };
+  }
+  function drawRobot(x, y, color) {
+    const p = mapToPixel(x, y);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // ✅ 3. 주기적 데이터 업데이트 (좌표 + 상태 로그)
+  async function updateData() {
+    try {
+        // (1) 좌표 업데이트
+        const resPose = await fetch("/ad_detect/api/poses");
+        const poses = await resPose.json();
+        
+        if (document.getElementById('map-view').classList.contains('active')) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (poses.robot1?.x) drawRobot(poses.robot1.x, poses.robot1.y, "red");
+            if (poses.robot3?.x) drawRobot(poses.robot3.x, poses.robot3.y, "blue");
+        }
+
+        // (2) ✅ 상태 로그 업데이트
+        const resStatus = await fetch("/ad_detect/api/status");
+        const status = await resStatus.json();
+        updateDebugUI("r1", status.robot1);
+        updateDebugUI("r3", status.robot3);
+
+    } catch (e) { console.error("API Error:", e); }
+  }
+
+  function updateDebugUI(prefix, info) {
+    const elStatus = document.getElementById(prefix + "-status");
+    document.getElementById(prefix + "-size").textContent = info.size;
+    document.getElementById(prefix + "-ago").textContent = info.ago;
+    document.getElementById(prefix + "-count").textContent = info.count;
+
+    if (info.connected) {
+        elStatus.textContent = "RECIEVING (OK)";
+        elStatus.className = "status-ok";
+    } else {
+        elStatus.textContent = "NO SIGNAL";
+        elStatus.className = "status-fail";
+    }
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  img.onload = resizeCanvas;
+  setInterval(updateData, 500); // 0.5초마다 갱신
+</script>
 </body>
 </html>

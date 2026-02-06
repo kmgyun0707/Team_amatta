@@ -1,90 +1,363 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ko">
 <head>
-  <meta charset="utf-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>분실물 신고</title>
   <style>
-    body { font-family: sans-serif; }
-    .box {
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --primary:#4f46e5;
+      --danger:#ff6b6b;
+      --chip:#eef2ff;
+      --chipText:#3730a3;
+      --shadow: 0 6px 18px rgba(0,0,0,0.08);
+      --radius:18px;
+    }
+    *{box-sizing:border-box;}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .wrap{
       width: 420px;
-      margin: 60px auto;
-      border: 2px solid #ccc;
-      border-radius: 20px;
+      max-width: calc(100% - 24px);
+      margin: 48px auto;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
       padding: 20px;
     }
-    label { display:block; margin-top: 12px; font-size: 13px; }
-    input, select {
+    .title{
+      font-size: 20px;
+      font-weight: 900;
+      margin: 6px 0 4px;
+      letter-spacing: -0.2px;
+    }
+    .sub{
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 16px;
+      line-height: 1.4;
+    }
+
+    .section{
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-top: 12px;
+    }
+    .section h3{
+      margin: 0 0 10px;
+      font-size: 14px;
+      font-weight: 800;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+    .badge{
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background:#f3f4f6;
+      color:#374151;
+      font-weight:700;
+    }
+
+    label{
+      display:block;
+      margin-top: 10px;
+      font-size: 12px;
+      color: #374151;
+      font-weight: 700;
+    }
+    .hint{
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    input, select{
       width: 100%;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid #ccc;
       margin-top: 6px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      outline: none;
+      background: #fff;
+      font-size: 13px;
     }
-    .checks label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-right: 10px;
-      margin-top: 8px;
+    input:focus, select:focus{
+      border-color: rgba(79,70,229,0.55);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
     }
-    button {
+    .row{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* chips for checkboxes */
+    .chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-top: 10px;
+    }
+    .chip{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: #fff;
+      cursor: pointer;
+      user-select:none;
+      transition: transform 0.02s ease;
+    }
+    .chip:active{ transform: scale(0.99); }
+    .chip input{ display:none; }
+    .chip .dot{
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      background: #fff;
+    }
+    .chip span{
+      font-size: 12px;
+      font-weight: 700;
+      color:#374151;
+    }
+    .chip input:checked + .dot{
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+    .chip input:checked ~ span{
+      color: var(--chipText);
+    }
+    .chip.checked{
+      background: var(--chip);
+      border-color: rgba(79,70,229,0.25);
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top: 16px;
+    }
+    .btn{
       width: 100%;
-      margin-top: 18px;
       padding: 12px;
       border-radius: 12px;
       border: none;
-      background: #4f46e5;
-      color: white;
       cursor: pointer;
+      font-weight: 800;
+      font-size: 14px;
     }
-    .back {
-      background: #eee;
-      color: #000;
+    .btn.primary{ background: var(--primary); color: #fff; }
+    .btn.primary:hover{ opacity: 0.95; }
+    .btn.secondary{ background: #eee; color: #111; }
+    .btn.secondary:hover{ opacity: 0.95; }
+
+    .req{ color:#b00020; font-weight:900; margin-left:4px; }
+
+    /* small footer note */
+    .foot{
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--muted);
+      line-height:1.45;
     }
   </style>
 </head>
+
 <body>
-  <div class="box">
-    <h2>분실물 신고</h2>
+  <div class="wrap">
+    <div class="title">분실물 신고</div>
+    <div class="sub">
+      분실하신 물건 정보를 입력하면 로봇이 방문 경로를 따라 탐색을 시작합니다.<br/>
+    </div>
 
-    <form method="POST">
-      <label>이름</label>
-      <input name="name" required>
+    <form method="POST" action="/lost_report" id="lostForm">
+      <!-- 기본 정보 -->
+      <div class="section">
+        <h3>신고자 정보 <span class="badge">필수</span></h3>
 
-      <label>전화번호</label>
-      <input name="phone" required>
+        <label>이름<span class="req">*</span></label>
+        <input name="name" placeholder="예) 홍길동" required />
 
-      <label>분실물 종류</label>
-      <select name="category" required>
-        <option value="">선택</option>
-        <option value="지갑">지갑</option>
-        <option value="가방">가방</option>
-        <option value="스마트폰">스마트폰</option>
-        <option value="이어폰">이어폰</option>
-      </select>
+        <label>전화번호<span class="req">*</span></label>
+        <input name="phone" placeholder="예) 010-1234-5678" required />
 
-      <label>색상</label>
-      <select name="color" required>
-        <option value="">선택</option>
-        <option value="검정색">검정색</option>
-        <option value="화이트">화이트</option>
-        <option value="파랑색">파랑색</option>
-      </select>
+        <div class="row">
+          <div>
+            <label>분실물 종류<span class="req">*</span></label>
+            <select name="category" id="category" required>
+              <option value="" selected disabled>종류 선택</option>
+              <option value="지갑">지갑</option>
+              <option value="이어폰">이어폰</option>
+              <option value="스마트폰">스마트폰</option>
+              <option value="여권">여권</option>
+              <option value="가방">가방</option>
+              <option value="충전기">충전기</option>
+              <option value="기타">기타(직접입력)</option>
+            </select>
+            <!-- 기타 선택 시 활성화 -->
+            <input name="category_etc" id="category_etc" placeholder="기타 항목 직접 입력" style="display:none;" />
+          </div>
 
-      <label>방문 장소 (복수 선택)</label>
-      <div class="checks">
-        <label><input type="checkbox" name="location" value="벤치">벤치</label>
-        <label><input type="checkbox" name="location" value="화장실">화장실</label>
-        <label><input type="checkbox" name="location" value="라운지">라운지</label>
+          <div>
+            <label>색상</label>
+            <select name="color" id="color">
+              <option value="" selected>선택 안 함</option>
+              <option value="검정">검정</option>
+              <option value="흰색">흰색</option>
+              <option value="회색">회색</option>
+              <option value="파랑">파랑</option>
+              <option value="빨강">빨강</option>
+              <option value="초록">초록</option>
+              <option value="노랑">노랑</option>
+              <option value="분홍">분홍</option>
+              <option value="보라">보라</option>
+              <option value="갈색">갈색</option>
+              <option value="기타">기타(직접입력)</option>
+            </select>
+            <input name="color_etc" id="color_etc" placeholder="기타 색상 직접 입력" style="display:none;" />
+          </div>
+        </div>
+
+
+        <label>분실 신고 시간</label>
+
+        <!-- 사용자에게 보여줄 입력(달력+시간) -->
+        <input type="datetime-local" id="losttime_picker" step="60" />
+
+        <!-- 서버로 보낼 실제 값(기존 name 유지) -->
+        <input type="hidden" name="losttime" id="losttime" />
+
+        <div class="hint">비워두면 현재 시간이 자동으로 저장됩니다. (분 단위 선택)</div>
       </div>
 
-      <label>분실 시간</label>
-      <input type="datetime-local" name="time">
+      <!-- 경로/게이트 -->
+      <div class="section">
+        <h3>탐색 정보 <span class="badge">선택/필수</span></h3>
 
-      <button type="submit">신고 접수</button>
+        <label>찾았으면 가져다줄 게이트<span class="req">*</span></label>
+        <select name="gate_id" required>
+          <option value="" selected disabled>게이트 선택</option>
+          {% for loc in locations %}
+            {% if 'gate' in (loc.loc_name | lower) %}
+              <option value="{{ loc.loc_id }}">{{ loc.loc_name }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+
+        <label>방문 경로(복수 선택)<span class="req">*</span></label>
+        <div class="hint">가능한 한 정확히 선택해주세요. 로봇이 해당 경로를 우선 탐색합니다.</div>
+
+        <div class="chips" id="chips">
+          {% for loc in locations %}
+            <!-- 게이트는 방문경로에서 빼고 싶으면 아래 조건 유지 -->
+            {% if 'gate' not in (loc.loc_name | lower) %}
+              <label class="chip" data-chip>
+                <input type="checkbox" name="loc_id" value="{{ loc.loc_id }}" />
+                <span class="dot"></span>
+                <span>{{ loc.loc_name }}</span>
+              </label>
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn primary">신고하기</button>
+        <button type="button" class="btn secondary" onclick="location.href='/'">돌아가기</button>
+      </div>
+
+      <div class="foot">
+        * 신고 접수 후 로봇이 탐색을 시작합니다. 입력 정보가 정확할수록 탐색이 빨라집니다.
+      </div>
     </form>
-
-    <button class="back" onclick="location.href='/'">돌아가기</button>
   </div>
+
+  <script>
+    // 체크박스를 칩 스타일로 토글(선택 시 배경색 변경)
+    const chips = document.querySelectorAll("[data-chip]");
+    chips.forEach(chip => {
+      const input = chip.querySelector("input[type='checkbox']");
+      const sync = () => chip.classList.toggle("checked", input.checked);
+      chip.addEventListener("click", (e) => {
+        // label 클릭 시 input 토글은 기본 동작이지만, class sync를 확실히 맞추기
+        setTimeout(sync, 0);
+      });
+      sync();
+    });
+
+    // 방문 경로 최소 1개 선택 검증
+    document.getElementById("lostForm").addEventListener("submit", (e) => {
+      const checked = document.querySelectorAll("input[name='loc_id']:checked").length;
+      if (checked === 0) {
+        e.preventDefault();
+        alert("방문 경로를 최소 1개 이상 선택해주세요.");
+      }
+    });
+    const categorySelect = document.getElementById("category");
+    const categoryEtc = document.getElementById("category_etc");
+    const colorSelect = document.getElementById("color");
+    const colorEtc = document.getElementById("color_etc");
+
+    function toggleEtc(selectEl, etcEl) {
+      const isEtc = selectEl.value === "기타";
+      etcEl.style.display = isEtc ? "block" : "none";
+      etcEl.required = isEtc; // 기타면 입력 필수(원하면 제거 가능)
+      if (!isEtc) etcEl.value = "";
+    }
+
+    if (categorySelect && categoryEtc) {
+      categorySelect.addEventListener("change", () => toggleEtc(categorySelect, categoryEtc));
+      toggleEtc(categorySelect, categoryEtc);
+    }
+    if (colorSelect && colorEtc) {
+      colorSelect.addEventListener("change", () => toggleEtc(colorSelect, colorEtc));
+      toggleEtc(colorSelect, colorEtc);
+    }
+
+    // --- datetime-local(YYYY-MM-DDTHH:MM) -> "YYYY-MM-DD HH:MM:SS"로 변환해서 전송 ---
+    const picker = document.getElementById("losttime_picker");
+    const hiddenLosttime = document.getElementById("losttime");
+
+    document.getElementById("lostForm").addEventListener("submit", (e) => {
+      // 방문 경로 최소 1개 선택 검증(기존 코드가 있다면 그 아래/위 어디든 OK)
+
+      // 시간 입력 처리: 비워두면 hidden도 비워둠 -> 서버에서 "현재시간" 처리
+      if (picker && hiddenLosttime) {
+        const v = picker.value; // "YYYY-MM-DDTHH:MM" or ""
+        if (!v) {
+          hiddenLosttime.value = "";
+        } else {
+          hiddenLosttime.value = v.replace("T", " ") + ":00"; // "YYYY-MM-DD HH:MM:00"
+        }
+      }
+
+      // category/color가 기타일 때: 서버에 무엇을 저장할지 결정
+      // - 방법 A: 서버에서 category_etc/color_etc를 보고 처리
+      // - 방법 B: 여기서 name=category, color에 최종값을 넣고 etc는 무시
+      // 아래는 "방법 B" 예시 (원하면 유지)
+      if (categorySelect && categorySelect.value === "기타" && categoryEtc?.value.trim()) {
+        // hidden input 없이도 select 값 대신 최종 값을 보내고 싶으면:
+        // select는 그대로 보내지므로, 서버에서 category_etc 우선 처리하는 편이 더 깔끔함.
+        // 여기선 서버 처리 권장 -> 아무것도 안 바꿈
+      }
+      if (colorSelect && colorSelect.value === "기타" && colorEtc?.value.trim()) {
+        // 서버 처리 권장
+      }
+    });
+  </script>
 </body>
 </html>

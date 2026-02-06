@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Ad Detect - Control Panel</title>
+  <style>
+    body { font-family: sans-serif; background-color: #f5f5f5; }
+    .wrap { width: 800px; margin: 24px auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    
+    /* 상단 메뉴 버튼 스타일 */
+    .menu-bar { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 15px; }
+    .menu-btn { 
+      padding: 10px 20px; font-size: 14px; font-weight: bold; cursor: pointer;
+      border: 1px solid #ddd; border-radius: 8px; background: #fff; transition: 0.3s;
+    }
+    .menu-btn.active { background: #007bff; color: white; border-color: #007bff; }
+    .menu-btn:hover { background: #f0f0f0; }
+    .menu-btn.active:hover { background: #0056b3; }
+
+    /* 콘텐츠 패널 스타일 */
+    .content-panel { display: none; border: 1px solid #ddd; border-radius: 12px; padding: 15px; background: #fafafa; }
+    .content-panel.active { display: block; }
+
+    /* 지도 관련 스타일 */
+    .map-stage { position: relative; width: 100%; max-width: 600px; margin: 0 auto; }
+    #mapImg { width: 100%; display: block; border-radius: 10px; }
+    #mapCanvas { position: absolute; left: 0; top: 0; }
+    
+    /* YOLO 스트리밍 스타일 */
+    .video-container { text-align: center; }
+    .yolo-stream { width: 100%; max-width: 640px; border-radius: 10px; background: #000; }
+    
+    .legend { margin-top: 10px; font-size: 13px; color: #444; display:flex; gap:12px; }
+    .dot { font-weight: 900; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>로봇 관제 시스템</h1>
+  
+  <div class="menu-bar">
+    <button class="menu-btn active" onclick="showPanel('map-panel', this)">Robot Position</button>
+    <button class="menu-btn" onclick="showPanel('yolo-robot1', this)">Robot 1 YOLO</button>
+    <button class="menu-btn" onclick="showPanel('yolo-robot3', this)">Robot 3 YOLO</button>
+    <a href="{{ url_for('ad_load_db.ad_load_db') }}" style="margin-left: auto;">
+      <button class="menu-btn" style="background: #28a745; color: white;">데이터베이스</button>
+    </a>
+  </div>
+
+  <div id="map-panel" class="content-panel active">
+    <div style="font-weight:700; margin-bottom:10px;">실시간 위치 (map.yaml)</div>
+    <div class="map-stage">
+      <img id="mapImg" src="{{ map_image_url }}" alt="map">
+      <canvas id="mapCanvas"></canvas>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="color:red">●</span> robot1</span>
+      <span><span class="dot" style="color:blue">●</span> robot3</span>
+      <span id="statusText">status: -</span>
+    </div>
+  </div>
+
+  <div id="yolo-robot1" class="content-panel">
+    <div class="video-container">
+      <h3>Robot 1 YOLO Detect View</h3>
+      <img class="yolo-stream" src="/ad_detect/video_feed/robot1" alt="Robot 1 Stream" onerror="this.src='https://via.placeholder.com/640x480?text=Waiting+for+Robot+1+Stream...'">
+    </div>
+  </div>
+
+  <div id="yolo-robot3" class="content-panel">
+    <div class="video-container">
+      <h3>Robot 3 YOLO Detect View</h3>
+      <img class="yolo-stream" src="/ad_detect/video_feed/robot3" alt="Robot 3 Stream" onerror="this.src='https://via.placeholder.com/640x480?text=Waiting+for+Robot+3+Stream...'">
+    </div>
+  </div>
+</div>
+
+<div id="map-meta" data-resolution='{{ map_resolution | tojson }}' data-origin='{{ map_origin | tojson }}'></div>
+
+<script>
+  // 패널 전환 함수
+  function showPanel(panelId, btn) {
+    // 모든 패널 숨기기
+    document.querySelectorAll('.content-panel').forEach(p => p.classList.remove('active'));
+    // 모든 버튼 활성화 해제
+    document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+    
+    // 선택한 패널 및 버튼 활성화
+    document.getElementById(panelId).classList.add('active');
+    btn.classList.add('active');
+
+    // 지도 패널이 보일 때 캔버스 크기 재조정
+    if(panelId === 'map-panel') {
+      resizeCanvasToImage();
+    }
+  }
+
+  // --- 기존의 좌표 변환 및 Fetch 로직 유지 ---
+  const meta = document.getElementById("map-meta");
+  const MAP_RESOLUTION = JSON.parse(meta.dataset.resolution);
+  const MAP_ORIGIN = JSON.parse(meta.dataset.origin);
+
+  const img = document.getElementById("mapImg");
+  const canvas = document.getElementById("mapCanvas");
+  const ctx = canvas.getContext("2d");
+  const statusText = document.getElementById("statusText");
+
+  function resizeCanvasToImage() {
+    if (!img.clientWidth) return; 
+    canvas.width = img.clientWidth;
+    canvas.height = img.clientHeight;
+  }
+
+  function mapToPixel(x, y, mapImageNaturalWidth, mapImageNaturalHeight) {
+    const originX = MAP_ORIGIN[0];
+    const originY = MAP_ORIGIN[1];
+    const px = (x - originX) / MAP_RESOLUTION;
+    const py_from_bottom = (y - originY) / MAP_RESOLUTION;
+    const py = mapImageNaturalHeight - py_from_bottom;
+    return {px, py};
+  }
+
+  function drawDot(px, py, colorName) {
+    const sx = canvas.width / img.naturalWidth;
+    const sy = canvas.height / img.naturalHeight;
+    const x = px * sx;
+    const y = py * sy;
+
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fillStyle = colorName;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+  }
+
+  async function fetchAndRender() {
+    // 지도 패널이 활성화되어 있을 때만 렌더링 (리소스 절약)
+    if (!document.getElementById('map-panel').classList.contains('active')) return;
+
+    try {
+      const res = await fetch("/ad_detect/api/poses", {cache: "no-store"});
+      const data = await res.json();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (data.robot1?.x !== null) {
+        const p1 = mapToPixel(data.robot1.x, data.robot1.y, img.naturalWidth, img.naturalHeight);
+        drawDot(p1.px, p1.py, "red");
+      }
+      if (data.robot3?.x !== null) {
+        const p3 = mapToPixel(data.robot3.x, data.robot3.y, img.naturalWidth, img.naturalHeight);
+        drawDot(p3.px, p3.py, "blue");
+      }
+      statusText.textContent = "status: OK";
+    } catch (e) {
+      statusText.textContent = "status: FAIL";
+    }
+  }
+
+  img.addEventListener("load", () => {
+    resizeCanvasToImage();
+    setInterval(fetchAndRender, 200);
+  });
+
+  window.addEventListener("resize", resizeCanvasToImage);
+</script>
+</body>
+</html>

@@ -1,80 +1,280 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ko">
 <head>
-    <title>분실물 찾기</title>
-    <style>
-        .container { width: 400px; margin: 0 auto; border: 2px solid #ccc; padding: 20px; border-radius: 20px; text-align: center; }
-        .filter-section { display: flex; justify-content: space-around; margin-bottom: 20px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .item-card { background: #eee; border-radius: 15px; padding: 10px; font-size: 12px; }
-        .image-box { width: 100%; height: 100px; background: #ccc; border-radius: 10px; margin-bottom: 5px; }
-        .not-found-wrap {margin-top: 18px;}
-        .not-found-btn {width: 100%; padding: 12px; border: none; border-radius: 12px; background: #ff6b6b; color: white; font-size: 14px; cursor: pointer;}
-        .not-found-btn:hover {opacity: 0.9;}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>무엇을 잃어버리셨나요?</h2>
-        
-        <div class="filter-section">
-            <select id="category" onchange="loadItems()">
-                <option value="전체">종류 (전체)</option>
-                <option value="지갑, 카드지갑">지갑</option>
-                <option value="블루투스 이어폰">이어폰</option>
-                <option value="가방">가방</option>
-                <option value="스마트폰">스마트폰</option>
-            </select>
-            <select id="color" onchange="loadItems()">
-                <option value="전체">색상 (전체)</option>
-                <option value="빨강색">빨강색</option>
-                <option value="주황색">주황색</option>
-                <option value="노란색">노란색</option>
-                <option value="초록색">초록색</option>
-                <option value="파랑색">파랑색</option>
-                <option value="남색">남색</option>
-                <option value="검정색">검정색</option>
-                <option value="화이트">화이트</option>
-                <option value="투명">투명</option>
-            </select>
-        </div>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>분실물 찾기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&display=swap" rel="stylesheet">
 
-        <div class="grid" id="item-list">
-            </div>
-        
-        <div class="not-found-wrap">
-            <button class="not-found-btn" onclick="location.href='/lost_report'">
-                찾는 물건이 없습니다
-            </button>
-        </div>
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --text:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --primary:#4f46e5;
+      --danger:#4f46e5;
+      --shadow: 0 6px 18px rgba(0,0,0,0.08);
+      --radius:18px;
+    }
+
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .wrap{
+      width:420px;
+      max-width: calc(100% - 24px);
+      margin: 48px auto;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .title{
+      font-family: 'Baloo 2', cursive;
+      font-size: 34px;
+      font-weight: 800;
+      text-align: center;
+      margin: 10px 0 6px;
+    }
+
+    .sub{
+      font-size:13px;
+      color:var(--muted);
+      margin-bottom:16px;
+    }
+
+    .section{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:14px;
+      margin-top:12px;
+    }
+
+    .filters{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    select{
+      width:100%;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      font-size:13px;
+      background:#fff;
+    }
+
+    select:focus{
+      border-color: rgba(79,70,229,0.55);
+      box-shadow: 0 0 0 3px rgba(79,70,229,0.12);
+      outline:none;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+
+    .item-card{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:10px;
+      font-size:12px;
+      cursor:pointer;
+      transition: transform 0.05s ease;
+    }
+
+    .item-card:hover{
+      transform: scale(1.01);
+    }
+
+    .image-box{
+      width:100%;
+      height:110px;
+      background:#eee;
+      border-radius:10px;
+      overflow:hidden;
+      margin-bottom:6px;
+    }
+
+    .image-box img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+    }
+
+    .meta{
+      font-size:11px;
+      color:var(--muted);
+      line-height:1.4;
+    }
+
+    .actions{
+      margin-top:18px;
+    }
+
+    .btn{
+      width:100%;
+      padding:12px;
+      border:none;
+      border-radius:12px;
+      font-size:14px;
+      font-weight:800;
+      cursor:pointer;
+    }
+
+    .btn.danger{
+      background: var(--danger);
+      color:#fff;
+    }
+
+    .btn:hover{ opacity:0.95; }
+
+    .admin-btn{
+      position: fixed;
+      left: 14px;
+      bottom: 14px;
+      padding: 6px 10px;
+      font-size: 11px;
+      border-radius: 10px;
+      border: none;
+      background: #e5e7eb;
+      color: #374151;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .admin-btn:hover{
+      background:#d1d5db;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="title">AMATTA</div>
+    <div class="sub">보관 중인 분실물을 확인하세요</div>
+
+    <!-- 필터 -->
+    <div class="section">
+      <div class="filters">
+        <select id="category" onchange="loadItems()">
+          <option value="전체">종류 (전체)</option>
+          <option value="지갑">지갑</option>
+          <option value="이어폰">이어폰</option>
+          <option value="가방">가방</option>
+          <option value="스마트폰">스마트폰</option>
+          <option value="여권">여권</option>
+          <option value="기타">기타 (직접입력)</option>
+        </select>
+
+        <select id="color" onchange="loadItems()">
+          <option value="전체">색상 (전체)</option>
+          <option value="빨강색">빨강색</option>
+          <option value="주황색">주황색</option>
+          <option value="노란색">노란색</option>
+          <option value="초록색">초록색</option>
+          <option value="파랑색">파랑색</option>
+          <option value="남색">남색</option>
+          <option value="검정색">검정색</option>
+          <option value="갈색">갈색</option>
+          <option value="흰색">흰색</option>
+          <option value="투명">투명</option>
+          <option value="기타">기타 (직접입력)</option>
+        </select>
+      </div> 
+      <div class="filters" style="margin-top:10px;">
+        <input id="category_etc" placeholder="카테고리 직접 입력"
+        style="display:none; width:100%; box-sizing:border-box; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:13px;" />
+
+        <input id="color_etc" placeholder="색상 직접 입력"
+        style="display:none; width:100%; box-sizing:border-box; padding:10px 12px; border-radius:12px; border:1px solid var(--line); font-size:13px;" />
+
+      </div>
     </div>
 
-    <script>
-        function loadItems() {
-            const category = document.getElementById('category').value;
-            const color = document.getElementById('color').value;
+    <!-- 분실물 리스트 -->
+    <div class="grid" id="item-list"></div>
 
-            fetch(`/filter?category=${category}&color=${color}`)
-                .then(response => response.json())
-                .then(data => {
-                    const list = document.getElementById('item-list');
-                    list.innerHTML = ''; // 기존 목록 초기화
-                    
-                    data.forEach(item => {
-                        list.innerHTML += `
-                            <div class="item-card">
-                                <div class="image-box"
-                                    onclick="location.href='/guide_start?item_id=${item.id}'">
-                                </div>
-                                <div>장소: ${item.location_x}, ${item.location_y}</div>
-                                <div>시간: ${item.time}</div>
-                            </div>
-                        `;
-                    });
-                });
-        }
-        // 페이지 로드 시 처음 한 번 실행
-        window.onload = loadItems;
-    </script>
+    <!-- 못 찾았을 때 -->
+    <div class="actions">
+      <button class="btn danger" onclick="location.href='/lost_report'">
+        찾는 물건이 없습니다
+      </button>
+    </div>
+  </div>
+
+  <script>
+    function loadItems() {
+        const categorySel = document.getElementById('category');
+        const colorSel = document.getElementById('color');
+        const category = categorySel.value;
+        const color = colorSel.value;
+
+        const categoryEtcInput = document.getElementById('category_etc');
+        const colorEtcInput = document.getElementById('color_etc');
+
+        // ✅ 기타 선택 시 입력창 표시/숨김
+        if (category === "기타") categoryEtcInput.style.display = "block";
+        else { categoryEtcInput.style.display = "none"; categoryEtcInput.value = ""; }
+
+        if (color === "기타") colorEtcInput.style.display = "block";
+        else { colorEtcInput.style.display = "none"; colorEtcInput.value = ""; }
+
+        const category_etc = categoryEtcInput.value.trim();
+        const color_etc = colorEtcInput.value.trim();
+
+        const qs =
+        `category=${encodeURIComponent(category)}&color=${encodeURIComponent(color)}` +
+        `&category_etc=${encodeURIComponent(category_etc)}` +
+        `&color_etc=${encodeURIComponent(color_etc)}`;
+
+        fetch(`/filter?${qs}`)
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('item-list');
+            list.innerHTML = '';
+
+            data.forEach(item => {
+            const imgSrc = item.image_path ? encodeURI(item.image_path) : "/static/신짱구.png";
+
+            list.innerHTML += `
+                <div class="item-card"
+                    onclick="location.href='/guide_start?item_id=${item.id}&counter=2'">
+                <div class="image-box">
+                    <img src="${imgSrc}" onerror="this.src='/static/신짱구.png';">
+                </div>
+                <div class="meta">장소: ${item.location_name ?? '알 수 없음'}</div>
+                <div class="meta">시간: ${item.time ?? ''}</div>
+                </div>
+            `;
+            });
+        });
+    }
+
+    // ✅ 입력 중에도 바로 필터 반영
+    document.addEventListener("DOMContentLoaded", () => {
+        loadItems();
+        document.getElementById("category_etc").addEventListener("input", loadItems);
+        document.getElementById("color_etc").addEventListener("input", loadItems);
+    });
+  </script>
+  <div class="actions" style="margin-top:10px;">
+        <button class="admin-btn" onclick="location.href='/ad_login'">
+          관리자
+        </button>
+  </div>
 </body>
 </html>
