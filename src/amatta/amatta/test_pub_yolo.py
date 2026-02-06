@@ -1,6 +1,6 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from airport_guide_interfaces.msg import DetectionInfo
 
 class YoloPublisher(Node):
     def __init__(self):
@@ -19,11 +19,11 @@ class YoloPublisher(Node):
                 user_input = input("\n탐지 여부(1 또는 0) > ").strip()
                 
                 # 3. 입력값에 따른 Bool 메시지 생성 로직
-                msg = Bool()
+                msg = DetectionInfo()
                 if user_input == '1':
-                    msg.data = True
+                    msg.detected = True
                 elif user_input == '0':
-                    msg.data = False
+                    msg.detected = False
                 else:
                     print("잘못된 입력입니다. 1 또는 0을 입력하세요.")
                     continue

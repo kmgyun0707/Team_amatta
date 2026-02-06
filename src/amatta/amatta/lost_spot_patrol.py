@@ -15,6 +15,7 @@ from airport_guide_interfaces.msg import DbInfo,DetectionInfo
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 import threading
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 # INPUTS (topics):
 # - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
@@ -45,22 +46,66 @@ class LostItemPatrol(Node):
         self.current_pose = None        # 로봇의 현재 위치값
         ns =self.get_namespace()
 
+        # BEST_EFFORT 설정 정의
+        # - Reliability: BEST_EFFORT (전송 속도 우선, 유실 허용)
+        # - History: KEEP_LAST (최신 데이터 유지를 위해 필수)
+        # - Depth: 10 (버퍼 크기)
+        qos_best_effort = QoSProfile(
+            reliability = ReliabilityPolicy.BEST_EFFORT,
+            history = HistoryPolicy.KEEP_LAST,
+            depth=10
+        )
+
+        ### Subscribers
+        # guide_to_info에서 발행하는 탐색 모드 토픽 구독
+        self.search_mode_sub = self.create_subscription(
+            Bool,
+            '/search_mode',
+            self.search_mode_callback,
+            10,
+            callback_group=self.callback_group)
+
         # 사용자가 이동한 장소에 대한 장소 번호 리스트를 담은 토픽 구독
         self.subscription = self.create_subscription(
             DbInfo,
-            f'/is_registered',
+            '/is_registered',
             self.topic_callback,
             10,
             callback_group=self.callback_group)
 
-        # guide_to_info에서 발행하는 탐색 모드 토픽 구독
-        self.search_mode_sub = self.create_subscription(
-            Bool,
-            f'/search_mode',
-            self.search_mode_callback,
+        #### 로봇1 좌표만 구독
+        self.pose_robot1_sub= self.create_subscription(
+            Pose,
+            '/robot1/simple_pose',
+            self.robot1_pose_callback,
+            qos_best_effort,
+            callback_group=self.callback_group)
+        
+        # 로봇 3의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
+        self.pose_robot3_sub = self.create_subscription(
+            PoseWithCovarianceStamped,
+            '/robot3/amcl_pose',
+            self.pose_callback,
+            qos_best_effort,
+            callback_group=self.callback_group)
+
+        # 분실물이 감지 되었는지 Bool 값 토픽 구독 (자기 자신이 분실물을 찾았는지 확인)
+        self.detection_robot3_sub = self.create_subscription(
+            DetectionInfo,
+            '/robot3/is_detected',
+            self.detection_robot3_callback,
             10,
             callback_group=self.callback_group)
         
+        # 분실물이 감지 되었는지 Bool 값 토픽 구독 (다른 로봇이 분실물을 찾았는지 확인)
+        self.detection_robot1_sub = self.create_subscription(
+            DetectionInfo,
+            '/robot1/is_detected',
+            self.detection_robot1_callback,
+            10,
+            callback_group=self.callback_group)
+        
+        ### Publisher
         # 로봇 3의 속도를 제어하기 위해 로봇의 /cmd_vel 발행
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
@@ -75,38 +120,6 @@ class LostItemPatrol(Node):
             10,
             callback_group=self.callback_group
         )
-
-        #### 로봇1 좌표만 구독
-        self.robot1_sub= self.create_subscription(
-            Pose,
-            '/robot1/simple_pose',
-            self.robot1_pose_callback,
-            10,
-            callback_group=self.callback_group
-        )
-        
-        # 로봇 2의 현재 위치 각각 구독 -> 로봇 간 거리 계산에 사용
-        self.robot2_sub = self.create_subscription(
-            PoseWithCovarianceStamped,
-            '/robot3/amcl_pose',
-            self.pose_callback,
-            10,
-            callback_group=self.callback_group)
-
-        # 분실물이 감지 되었는지 Bool 값 토픽 구독
-        self.detection_robot3_sub = self.create_subscription(
-            DetectionInfo,
-            '/robot3/is_detected',
-            self.detection_robot3_callback,
-            10,
-            callback_group=self.callback_group)
-        
-        self.detection_robot1_sub = self.create_subscription(
-            DetectionInfo,
-            '/robot1/is_detected',
-            self.detection_robot1_callback,
-            10,
-            callback_group=self.callback_group)
 
         # 목표 지점 정의 (robot 3 좌표 기준)
         self.goal_options = [
@@ -184,12 +197,14 @@ class LostItemPatrol(Node):
     # 로봇 1 : amcl 토픽중 좌표와 방향만 저장
     def robot1_pose_callback(self, msg):
         self.robot1_pose = msg
+        self.get_logger().info(f'robot 1 pose: {self.robot1_pose}')
     
     # 로봇 2 : amcl 토픽중 좌표와 방향만 저장
     def pose_callback(self, msg):
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
+        self.get_logger().info(f'내 위치: {self.current_pose}')
 
         self.robot2_pose = msg.pose.pose
     
@@ -203,8 +218,11 @@ class LostItemPatrol(Node):
     
     # 로봇1이 얼마나 가까이에 있는지 확인
     def is_robot1_nearby(self, threshold=1.0):      # threshold: 안전 거리
-        if self.robot1_pose is None or self.robot2_pose is None:
-            self.get_logger().error(f'로봇 위치 못 받아옴')
+        if self.robot1_pose is None:
+            self.get_logger().warn('Waiting for Robot 1 pose...', throttle_duration_sec=2.0)
+            return False
+        if self.robot2_pose is None:
+            self.get_logger().warn('Waiting for My (Robot 3) pose...', throttle_duration_sec=2.0)
             return False
 
         dist = math.sqrt(       # 로봇 간 직선 거리 계산

@@ -42,10 +42,9 @@ class VisitedHistoryPatrol(Node):
         self.detected_robot3 = False        # 분실물을 인지했는지 여부
         self.detected_robot1 = False
         self.current_pose = None 
-        
         ns =self.get_namespace()
 
-        # [2] BEST_EFFORT 설정 정의 (핵심)
+        # BEST_EFFORT 설정 정의
         # - Reliability: BEST_EFFORT (전송 속도 우선, 유실 허용)
         # - History: KEEP_LAST (최신 데이터 유지를 위해 필수)
         # - Depth: 10 (버퍼 크기)
@@ -55,6 +54,7 @@ class VisitedHistoryPatrol(Node):
             depth=10
         )
 
+        ### Subscribers
         # guide_to_info에서 발행하는 탐색 모드 토픽 구독
         self.search_mode_sub = self.create_subscription(
             Bool,
@@ -69,8 +69,7 @@ class VisitedHistoryPatrol(Node):
             '/is_registered',
             self.topic_callback,
             10,
-            callback_group=self.callback_group
-        )
+            callback_group=self.callback_group)
 
         # 로봇 1의 현재 위치 구독 -> 경로 생성 사용
         self.subscription_pose = self.create_subscription(
@@ -78,30 +77,31 @@ class VisitedHistoryPatrol(Node):
             f'{ns}/amcl_pose',
             self.pose_callback,
             qos_best_effort,
-            callback_group=self.callback_group
-        )
+            callback_group=self.callback_group)
 
-        ## 로봇1의 좌표 발행
-        self.robot1_pose_pub = self.create_publisher(
-            Pose, 
-            '/robot1/simple_pose', 
-            qos_best_effort
-        )
-
-        # 분실물이 감지 되었는지 Bool 값 토픽 구독
+        # 분실물이 감지 되었는지 Bool 값 토픽 구독 (자기 자신이 분실물을 찾았는지 확인)
         self.detection_robot1_sub = self.create_subscription(
             DetectionInfo,
             '/robot1/is_detected',
             self.detection_robot1_callback,
             10,
-            callback_group=self.callback_group
-        )
+            callback_group=self.callback_group)
+        
+        # 분실물이 감지 되었는지 Bool 값 토픽 구독 (다른 로봇이 분실물을 찾았는지 확인)
         self.detection_robot3_sub = self.create_subscription(
             DetectionInfo,
             '/robot3/is_detected',
             self.detection_robot3_callback,
             10,
             callback_group=self.callback_group)
+        
+        ### Publisher
+        ## 로봇1의 좌표 발행
+        self.robot1_pose_pub = self.create_publisher(
+            Pose, 
+            '/robot1/simple_pose', 
+            qos_best_effort
+        )
 
         # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
