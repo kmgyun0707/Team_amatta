@@ -198,6 +198,20 @@ class VisitedHistoryPatrol(Node):
             'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
         ]
 
+        ####################### 에러 뜨는지 확인 ########################
+        # 1. 초기화 및 Docking 상태 확인
+        if not self.navigator.getDockedStatus():
+            self.navigator.info('Docking before initialising pose')
+            self.navigator.dock()
+
+        # 2. 초기 위치 설정
+        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        self.navigator.setInitialPose(initial_pose)
+
+        # 3. Nav2 활성화 대기 및 Undock
+        self.navigator.waitUntilNav2Active()
+        self.navigator.undock()
+
     # 가이드 노드로부터 탐색 모드인지 서브스크라이브
     def search_mode_callback(self, msg):
         self.search_mode = msg.data
@@ -459,7 +473,7 @@ def main(args=None):
     try:
         while rclpy.ok():
             # 데이터를 받으면 순찰 시작
-            if tracer.search_mode and not tracer.registered: 
+            if tracer.search_mode and not tracer.registered and len(tracer.visited_spot) > 0:       # visited_spot 값이 늦게 도착할 경우를 대비하여 조건 추가
                 tracer.run_patrol()
                 tracer.registered = False 
                 tracer.search_mode = False 

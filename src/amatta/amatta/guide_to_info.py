@@ -74,7 +74,9 @@ class GuideToInfo(Node):
         #     msg.data = False
         
         # self.publisher.publish(msg)
+        self.get_logger().info(f'publish*********{self.registered}')
         if self.registered is None:
+            self.get_logger().info(f'no publish*********')
             return 
         if not self.search_mode_published:
             msg = Bool()
@@ -89,13 +91,10 @@ class GuideToInfo(Node):
 
     
     def db_callback(self, msg):
-        self.get_logger().info("db in*************")
         if self.handle_registration:
             return
-        if self.registered is not None:
-            return
         self.registered = msg.registered
-        self.get_logger().info(f"registered :{self.registered}")
+        self.get_logger().info(f"Received DB Info: registered={self.registered}")
         # 분실물이 있으면 분실물 보관소로 이동
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
