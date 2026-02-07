@@ -77,7 +77,7 @@ class LostItemPatrol(Node):
         #### 로봇1 좌표만 구독
         self.pose_robot1_sub= self.create_subscription(
             Pose,
-            '/robot1/simple_pose',
+            '/robot3/simple_pose',      # robot1 -> robot 3 수정
             self.robot1_pose_callback,
             qos_best_effort,
             callback_group=self.callback_group)
@@ -154,7 +154,7 @@ class LostItemPatrol(Node):
 
             # 7 남자화장실 (Mens Room)
             {'name': 'Mens_Room',
-             'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
+             'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}  # robot 1 기준 좌표로 수정
         ]
         self.gate_options = [
             # 0번 인덱스: Gate 1
@@ -172,7 +172,7 @@ class LostItemPatrol(Node):
             self.navigator.dock()
 
         # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)      # y값 0.0에서 수정
         self.navigator.setInitialPose(initial_pose)
 
         # 3. Nav2 활성화 대기 및 Undock
@@ -446,6 +446,7 @@ def main(args=None):
             
             # Guide 노드로부터 search mode 받고, DB로부터 사용자 이동 경로 받으면 탐색 시작
             if patrol_robot.search_mode and not patrol_robot.registered:
+                patrol_robot.get_logger().info("patrol 시작")
                 patrol_robot.run_patrol()
 
 
