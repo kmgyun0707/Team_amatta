@@ -26,7 +26,7 @@ class GuideToInfo(Node):
         self.registered = None                                  # DB에 분실물 존재 여부
         self.handle_registration = False                        # 한번만 구독하기 위한 변수
         self.search_mode_published = False                      # 한번만 발행하기 위한 변수
-
+        self.is_navigating = False                            # 현재 네비게이션 중인지 여부
 
         # 퍼블리셔
         self.publisher = self.create_publisher(                 # 탐색 모드 여부(True = 탐색모드 시작) 발행
@@ -73,6 +73,7 @@ class GuideToInfo(Node):
         self.navigator.waitUntilNav2Active()
         self.navigator.info('After Nav Activated')
         self.navigator.undock()
+
     def db_callback(self, msg):
         if self.handle_registration:
             return
@@ -87,8 +88,9 @@ class GuideToInfo(Node):
             self.get_logger().info(f'Guide to Counter...') 
 
             #[수정] while안쓰고 비동기적으로 액션만 보내도록 변경
-            self.navigator.startToPose(self.target_pose[0]['pose']) # 분실물 보관소로 이동 시작
+            self.navigator.startToPose(self.target_pose_robot3[0]['pose']) # 분실물 보관소로 이동 시작
             self.is_navigating = True
+
         else: # case 2: 분실물 미발견(False) -> 탐색 모드 시작
             self.get_logger().info(f'Start Search Mode...')
             msg = Bool()
