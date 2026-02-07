@@ -56,7 +56,8 @@ class GuideToInfo(Node):
             self.navigator.dock()
 
         # 2. 초기 위치 설정
-        initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)
+        # initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)
+        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)        # robot3으로 실행 시
         self.navigator.setInitialPose(initial_pose)
 
         # 3. Nav2 활성화 대기 및 Undock
