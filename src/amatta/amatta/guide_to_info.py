@@ -73,60 +73,46 @@ class GuideToInfo(Node):
         self.navigator.waitUntilNav2Active()
         self.navigator.info('After Nav Activated')
         self.navigator.undock()
-
-
-    # 서브스크라이버 콜백함수: registered = True일 경우 카운터로 가이드
-    def db_callback(self, msg):     
-
-        # 안내 모드가 이미 활성화되었다면 이후의 DB 메시지는 무시함 (중복 가이딩 방지)
+    def db_callback(self, msg):
         if self.handle_registration:
             return
         
+        self.handle_registration = True
+        # DB에서 분실물 등록 여부 수신
         self.registered = msg.registered
         self.get_logger().info(f"Received DB Info: registered={self.registered}")
-
-        # 분실물이 있으면 분실물 보관소로 이동
-        if self.registered:
-            self.get_logger().info(f'Guide to Counter...')
-            self.handle_registration = True                                         # 불필요한 중복 명령 방지를 위해 콜백 비활성화
-            self.navigator.startToPose(self.target_pose_robot3[0]['pose'])          # 카운터로 이동 (robot3으로 실행 시 robot3 좌표값 사용)
-
-            while not self.navigator.isTaskComplete():                              # 내비게이션 태스크가 완료(성공, 실패, 취소)될 때까지 반복
-                if not rclpy.ok():                                                  # 프로그램이 강제 종료(Ctrl+C)되었는지 확인
-                    return
-                time.sleep(0.1)                                                     # 0.1초마다 태스크 완료 여부 확인 (CPU 과부하 방지)
-
-            # 카운터 이동 결과 확인
-            result = self.navigator.getResult()                                     # 이 경우에만 코드 종료되도록 수정 필요
-            if result == TaskResult.SUCCEEDED:      
-                self.navigator.info(f'Arrived at entrance!')
-                rclpy.shutdown()                                                    # 태스크 완료 시, 코드 종료
-
-            elif result == TaskResult.CANCELED:
-                self.navigator.info(f'Navigation to entrance was canceled.')
-                self.handle_registration = False                                    # 최소된 경우, 다시 명령을 받을 수 있도록 잠금 해제
-
-            elif result == TaskResult.FAILED:
-                self.navigator.error(f'Failed to reach entrance.')
-                self.handle_registration = False                                    # 실패할 경우, 다시 명령을 받을 수 있도록 잠금 해제
-
-
-    # 퍼블리시 콜백함수: registered = False일 경우 search_mode = True 발행 
-    def timer_callback(self):       
-        self.get_logger().info(f'publisher in*********{self.registered}')
-
-        # DB 로부터 토픽을 받지 않았을 경우, 콜백함수 종료
-        if self.registered is None:
-            self.get_logger().info(f'no publish*********')
-            return 
         
-        # DB 로부터 토픽을 받았을 경우, search mode 한 번만 발행
-        if not self.search_mode_published:
+        # case 1: 분실물 발견(True) -> 가이드 모드 시작
+        if self.registered: 
+            self.get_logger().info(f'Guide to Counter...') 
+
+            #[수정] while안쓰고 비동기적으로 액션만 보내도록 변경
+            self.navigator.startToPose(self.target_pose[0]['pose']) # 분실물 보관소로 이동 시작
+            self.is_navigating = True
+        else: # case 2: 분실물 미발견(False) -> 탐색 모드 시작
+            self.get_logger().info(f'Start Search Mode...')
             msg = Bool()
-            msg.data = not self.registered
-            self.publisher.publish(msg)
-            self.search_mode_published = True       # True 처리하여 한 번만 발행
-            self.timer.cancel()
+            msg.data = True
+            self.publisher.publish(msg) 
+
+
+    def timer_callback(self):       # DB의 분실물 여부 퍼블리시
+        if not self.is_navigating:
+            return
+        
+        if self.navigator.isTaskComplete():
+            result = self.navigator.getResult() # 이동 결과 확인
+             # 결과에 따른 로그 출력 및 상태 업데이트
+
+            if result == TaskResult.SUCCEEDED:      
+                self.navigator.info(f'Arrived at Counter!')
+                self.is_navigating = False # 도착 시 다시 탐색 모드 발행 가능하도록 설정
+            elif result == TaskResult.CANCELED:
+                self.navigator.info(f'Navigation to Counter was canceled.')
+                self.is_navigating = False # 취소 시 다시 탐색 모드 발행 가능하도록 설정
+            elif result == TaskResult.FAILED:
+                self.navigator.error(f'Failed to reach Counter.')
+                self.is_navigating = False # 실패 시 다시 탐색 모드 발행 가능하도록 설정
 
 
 
