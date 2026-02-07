@@ -18,6 +18,7 @@ from rclpy.time import Time
 from rclpy.duration import Duration 
 from my_robot_interfaces.msg import DetectionResult # DB 저장용
 from airport_guide_interfaces.msg import DetectionInfo  # Navigator 알림용
+from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 
 
 
@@ -27,6 +28,8 @@ class Detect_to_Lossitem(Node):
         super().__init__('detect_to_lossitem')
         self.get_logger().info('=== Detect_to_Lossitem 노드 초기화 시작 ===')
         
+        self.navigator = TurtleBot4Navigator()
+
         self.bridge = CvBridge()
         self.model = model
         self.classNames = model.names
@@ -67,107 +70,115 @@ class Detect_to_Lossitem(Node):
             self.get_logger().info('카메라 내부 파라미터(K) 수신 완료!')
             self.info_received = True
 
+    #
     def synchronized_callback(self, rgb_msg, depth_msg):
         start_time = time.time() # 성능 모니터링 시작
         frame_id = getattr(self, 'camera_frame', None)
-
+        is_depth=  False
         self.detected = False
         
         if self.K is None:
             self.get_logger().warn('카메라 정보(K)가 아직 없어 처리를 건너뜁니다.', throttle_duration_sec=5.0)
             return
+        
+        if not depth_msg :
+            try:
+                # 1. 데이터 디코딩
+                np_arr = np.frombuffer(rgb_msg.data, np.uint8)
+                rgb_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+                depth_img = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
+                frame_id = depth_msg.header.frame_id
+                self.get_logger().info("frame_id")
+                self.get_logger().info("rgb_msg.header.frame_id")
+                
+                # 2. YOLO 추론
+                results = self.model.predict(rgb_img, verbose=False, conf=0.3 ,device ='0')
+                
+                num_detected = 0
+                for r in results:
+                    self.detected = True
+                    num_detected += len(r.boxes)
+                    for box in r.boxes:
+                        x1, y1, x2, y2 = map(int, box.xyxy[0])
+                        cx, cy = (x1 + x2) // 2, (y1 + y2) // 2 #중심점
+                        label_name = self.classNames[int(box.cls[0])] if int(box.cls[0]) < len(self.classNames) else "Unknown"
+                        self.get_logger().info(f'**********11 인지:{label_name}***********')
+                        # 이미지 범위 체크 (IndexError 방지)
+                        if cy >= depth_img.shape[0] or cx >= depth_img.shape[1]:
+                            continue
 
-        try:
-            # 1. 데이터 디코딩
-            np_arr = np.frombuffer(rgb_msg.data, np.uint8)
-            rgb_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            depth_img = self.bridge.imgmsg_to_cv2(depth_msg, desired_encoding='passthrough')
-            frame_id = depth_msg.header.frame_id
-            self.get_logger().info("frame_id")
-            self.get_logger().info("rgb_msg.header.frame_id")
-            
-            # 2. YOLO 추론
-            results = self.model.predict(rgb_img, verbose=False, conf=0.3)
-            
-            num_detected = 0
-            for r in results:
-                self.detected = True
-                num_detected += len(r.boxes)
-                for box in r.boxes:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    cx, cy = (x1 + x2) // 2, (y1 + y2) // 2 #중심점
-                    label_name = self.classNames[int(box.cls[0])] if int(box.cls[0]) < len(self.classNames) else "Unknown"
-                    # 이미지 범위 체크 (IndexError 방지)
-                    if cy >= depth_img.shape[0] or cx >= depth_img.shape[1]:
-                        continue
+                        z = float(depth_img[cy, cx]) / 1000.0
+                        if z <= 0.1 or z > 5.0:
+                            continue
 
-                    z = float(depth_img[cy, cx]) / 1000.0
-                    if z <= 0.1 or z > 5.0:
-                        continue
-
-                    # 3. 좌표 변환
-                    pt_camera = PointStamped()
-                    pt_camera.header.stamp = depth_msg.header.stamp
-                    pt_camera.header.frame_id = frame_id
-                    
-                    fx, fy, ox, oy = self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]
-                    pt_camera.point.x = (cx - ox) * z / fx
-                    pt_camera.point.y = (cy - oy) * z / fy
-                    pt_camera.point.z = z
-
-                    try:
-                        pt_map = self.tf_buffer.transform(pt_camera, 'map', timeout=Duration(seconds=1.0))
+                        # 3. 좌표 변환
+                        pt_camera = PointStamped()
+                        pt_camera.header.stamp = depth_msg.header.stamp
+                        pt_camera.header.frame_id = frame_id
                         
+                        fx, fy, ox, oy = self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]
+                        pt_camera.point.x = (cx - ox) * z / fx
+                        pt_camera.point.y = (cy - oy) * z / fy
+                        pt_camera.point.z = z
+                        self.get_logger().info(f'**********1.5 1.5 :{pt_camera.point.z}***********')
 
-                        goal_pose = PoseStamped()
-                        goal_pose.header.frame_id = 'map'
-                        goal_pose.header.stamp = self.get_clock().now().to_msg()
-                        goal_pose.pose.position.x = pt_map.point.x
-                        goal_pose.pose.position.y = pt_map.point.y
-                        goal_pose.pose.position.z = 0.0
-                        # yaw = 0.0
-                        # qz = math.sin(yaw / 2.0)
-                        # qw = math.cos(yaw / 2.0)
-                        # car view orientation
-                        # qz = -0.775
-                        # qw =  0.632
-                        # goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=qz, w=qw)
+                        try:
+                            pt_map = self.tf_buffer.transform(pt_camera, 'map', timeout=Duration(seconds=1.0))
+                            self.get_logger().info(f'**********22 :{pt_map.point.x}, {pt_map.point.y}***********')
 
-                        self.goal = goal_pose
+                            goal_pose = PoseStamped()
+                            goal_pose.header.frame_id = 'map'
+                            goal_pose.header.stamp = self.get_clock().now().to_msg()
+                            goal_pose.pose.position.x = pt_map.point.x
+                            goal_pose.pose.position.y = pt_map.point.y
+                            goal_pose.pose.position.z = 0.0
+                            # yaw = 0.0
+                            # qz = math.sin(yaw / 2.0)
+                            # qw = math.cos(yaw / 2.0)
+                            # car view orientation
+                            # qz = -0.775
+                            # qw =  0.632
+                            # goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=qz, w=qw)
 
-                        # 발행할 메시지
-                        detect_msg = DetectionInfo()
-                        detect_msg.goal = self.goal
-                        detect_msg.detected = self.detected
-                        self.is_detected.publish(detect_msg)        # /is_detected 발행
+                            self.goal = goal_pose
+
+                            # 발행할 메시지
+                            detect_msg = DetectionInfo()
+                            detect_msg.goal = self.goal
+                            detect_msg.detected = self.detected
+                            self.is_detected.publish(detect_msg)        # /is_detected 발행
+                            
+                            self.get_logger().info(f'**********33 go pose***********')
+                            self.navigator.startToPose(detect_msg.goal)
+
+                            # 검출 정보 로깅
                         
+                            self.get_logger().info(f'[{label_name}] 발견! 위치: x={pt_map.point.x:.2f}, y={pt_map.point.y:.2f}, 거리={z:.2f}m')
 
-                        # 검출 정보 로깅
-                       
-                        self.get_logger().info(f'[{label_name}] 발견! 위치: x={pt_map.point.x:.2f}, y={pt_map.point.y:.2f}, 거리={z:.2f}m')
+                            # 시각화
+                            label = f"{label_name} ({pt_map.point.x:.1f}, {pt_map.point.y:.1f})"
+                            cv2.rectangle(rgb_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                            cv2.putText(rgb_img, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-                        # 시각화
-                        label = f"{label_name} ({pt_map.point.x:.1f}, {pt_map.point.y:.1f})"
-                        cv2.rectangle(rgb_img, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                        cv2.putText(rgb_img, label, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                        
+                            self.get_logger().info('Published custom message!')
+                        except Exception as e:
+                            self.get_logger().warn(f'TF 변환 실패 ({label_name}): {e} {pt_camera.point.z}')
+                            continue
 
-                      
-                        self.get_logger().info('Published custom message!')
-                    except Exception as e:
-                        self.get_logger().warn(f'TF 변환 실패 ({label_name}): {e} {pt_camera.point.z}')
-                        continue
+                # 4. 결과 발행 및 성능 로그
+                out_msg = self.bridge.cv2_to_imgmsg(rgb_img, encoding="bgr8")
+                self.loss_item_view_pub.publish(out_msg)
+                
+                end_time = time.time()
+                processing_ms = (end_time - start_time) * 1000
+                if num_detected > 0:
+                    self.get_logger().debug(f'프레임 처리 완료: {num_detected}개 검출, 소요시간: {processing_ms:.1f}ms')
 
-            # 4. 결과 발행 및 성능 로그
-            out_msg = self.bridge.cv2_to_imgmsg(rgb_img, encoding="bgr8")
-            self.loss_item_view_pub.publish(out_msg)
-            
-            end_time = time.time()
-            processing_ms = (end_time - start_time) * 1000
-            if num_detected > 0:
-                self.get_logger().debug(f'프레임 처리 완료: {num_detected}개 검출, 소요시간: {processing_ms:.1f}ms')
-
-        except Exception as e:
-            self.get_logger().error(f'콜백 실행 중 예외 발생: {e}')
+            except Exception as e:
+                self.get_logger().error(f'콜백 실행 중 예외 발생: {e}')
+            finally:
+                is_depth =True
 
 def main():
     # 경로 확인 비판: 파일이 실제로 있는지 확인하는 로직을 넣으면 더 좋습니다.
