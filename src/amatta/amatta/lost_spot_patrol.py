@@ -37,6 +37,7 @@ class LostItemPatrol(Node):
 
         # 토픽 수신 여부와 데이터를 저장할 변수 초기화
         self.visited_spot = []          # 이동할 경로 리스트
+        self.visited_spot_raw = []  # 에러 해결을 위해 초기화 필요
         self.registered = False   # db로부터 토픽을 수신했는지 여부
         self.search_mode = False        # 탐색 모드 여부
         self.detected_robot3 = False        # 분실물을 인지했는지 여부
@@ -197,24 +198,33 @@ class LostItemPatrol(Node):
     # 로봇 1 : amcl 토픽중 좌표와 방향만 저장
     def robot1_pose_callback(self, msg):
         self.robot1_pose = msg
-        self.get_logger().info(f'robot 1 pose: {self.robot1_pose}')
+        # self.get_logger().info(f'robot 1 pose: {self.robot1_pose}')
     
     # 로봇 2 : amcl 토픽중 좌표와 방향만 저장
     def pose_callback(self, msg):
         self.current_pose = PoseStamped()
         self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
-        self.get_logger().info(f'내 위치: {self.current_pose}')
 
         self.robot2_pose = msg.pose.pose
     
     # 분실물을 발견했는지 실시간 저장
     def detection_robot1_callback(self, msg):
-        self.detected_robot1 = msg.detected
+        if msg.detected:
+            self.detected_robot1 = msg.detected
+            self.get_logger().info(f'로봇 1 발견: {msg.detected}')
+            self.navigator.cancelTask()
+            self.stop_robot()
         
     def detection_robot3_callback(self, msg):
-        self.detected_robot3 = msg.detected
-        self.goal = msg.goal
+        if msg.detected:
+            self.detected_robot3 = msg.detected
+            self.goal = msg.goal
+            self.get_logger().info(f'로봇 3 발견: {msg.detected}')
+            self.navigator.cancelTask()
+            self.stop_robot()
+            self.get_logger().info(f'분실물 회수, {self.gate_name}로 이동')
+            self.navigator.startToPose(self.gate_pose)
     
     # 로봇1이 얼마나 가까이에 있는지 확인
     def is_robot1_nearby(self, threshold=1.0):      # threshold: 안전 거리
@@ -297,6 +307,10 @@ class LostItemPatrol(Node):
     def run_patrol(self):
         # 사용자가 방문한 장소을 제외한 목표 지점 결정
         all_indices = list(range(len(self.goal_options)))
+        # 사용자 이동 내역이 없을 경우 종료
+        if not self.visited_spot_raw:
+            self.navigator.info("No targets selected. Exiting.")
+            return
         self.visited_spot = [idx for idx in all_indices if idx not in self.visited_spot_raw]
         
         print(f"\n최종 방문할 장소 인덱스: {self.visited_spot}")
@@ -326,11 +340,15 @@ class LostItemPatrol(Node):
 
         # 주행 시작
         for index in best_route:
+            if self.detected_robot1 or self.detected_robot3:
+                self.get_logger().info("Detection! Stopping patrol")
+                return
+
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
 
-            gate_name = self.gate_options[self.gate_id]['name']
-            gate_pose = self.gate_options[self.gate_id]['pose']
+            self.gate_name = self.gate_options[self.gate_id]['name']
+            self.gate_pose = self.gate_options[self.gate_id]['pose']
 
             # 로봇 1이 로봇2와의 거리가 1.5미터 이내면 대기
             while self.is_robot1_nearby(1.5):
@@ -341,6 +359,7 @@ class LostItemPatrol(Node):
             self.navigator.startToPose(target_pose)
 
             while not self.navigator.isTaskComplete():
+                # time.sleep(1.0)
 
                 # 다른 로봇이 분실물 인지했을 경우, 정지 후 코드 종료
                 if self.detected_robot1:
@@ -356,8 +375,8 @@ class LostItemPatrol(Node):
                     self.stop_robot()       # 추후 접근으로 구현 필요
                     time.sleep(5.0)
                     # 게이트로 이동
-                    self.get_logger().info(f'go to {gate_name}')
-                    self.navigator.startToPose(gate_pose)
+                    self.get_logger().info(f'go to {self.gate_name}')
+                    self.navigator.startToPose(self.gate_pose)
 
                     while not self.navigator.isTaskComplete():
                         time.sleep(0.1)
@@ -366,13 +385,13 @@ class LostItemPatrol(Node):
 
 
                 # 로봇1,2간의 거리가 1미터 이내 일때
-                if self.is_robot1_nearby(1.0):
+                if self.is_robot1_nearby(3.0):
                     self.navigator.info("Robot 1 approaching! Yielding...")
                     self.navigator.cancelTask()
                     self.stop_robot()
 
                     # 로봇간의 거리가 1미터 이상이 될 때 까지 대기
-                    while self.is_robot1_nearby(1.0):
+                    while self.is_robot1_nearby(3.0):
                         self.navigator.info("Robot 1 approaching! Yielding...")
                         time.sleep(1.0)
                     
@@ -386,8 +405,8 @@ class LostItemPatrol(Node):
                 time.sleep(1.0)
 
                 # 게이트로 이동
-                self.get_logger().info(f'go to {gate_name}')
-                self.navigator.startToPose(gate_pose)
+                self.get_logger().info(f'go to {self.gate_name}')
+                self.navigator.startToPose(self.gate_pose)
 
             elif result == TaskResult.CANCELED:
                 self.navigator.info(f'Navigation to {target_name} was canceled.')
@@ -422,7 +441,7 @@ def main(args=None):
     try:
         patrol_robot.get_logger().info("Main Loop Started. Waiting for command...")
         while rclpy.ok():
-            patrol_robot.get_logger().info(f'search mode: {patrol_robot.search_mode}')
+            # patrol_robot.get_logger().info(f'search mode: {patrol_robot.search_mode}',throttle_duration_sec=2.0)
             
             # Guide 노드로부터 search mode 받고, DB로부터 사용자 이동 경로 받으면 탐색 시작
             if patrol_robot.search_mode and not patrol_robot.registered:
@@ -433,7 +452,6 @@ def main(args=None):
                 # 탐색이 끝나면 프로그램 종료
                 patrol_robot.search_mode = False 
                 patrol_robot.get_logger().info("Patrol finished. Waiting for next command or Exit.")
-                break   # 한 번만 하고 끌거면 break 사용
                 
     except KeyboardInterrupt:
         pass
