@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'project'
+package_name = 'turtlebot4_beep'
 
 setup(
     name=package_name,
@@ -16,7 +16,7 @@ setup(
     maintainer='rokey',
     maintainer_email='abbeyroad1027@gmail.com',
     description='TODO: Package description',
-    license='TODO: License declaration',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',
@@ -24,14 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "dt = project.detects:main",
-            'dt2 = project.detects2:main',
-            'dt3 = project.detects3:main',
-            "depth = project.depth_test:main",
-            "detect = project.dets:main",
-            "tt = project.topics_pub_test:main",
-            'hb = project.hb:main',
-            
+            'beep_node = turtlebot4_beep.beep_node:main'
         ],
     },
 )
