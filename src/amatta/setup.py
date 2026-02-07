@@ -34,6 +34,7 @@ setup(
             'test_db = amatta.test_pub_db:main',
             'test_ac = amatta.test_accident:main',
             'guide = amatta.guide_to_info:main',
+            'pct = amatta.perception:main',
         ],
     },
 )

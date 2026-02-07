@@ -9,6 +9,7 @@
 
   <depend>rclpy</depend>
   <depend>airport_guide_interfaces</depend> 
+  <depend>my_robot_interfaces</depend> 
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
 
