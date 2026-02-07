@@ -100,8 +100,8 @@ class VisitedHistoryPatrol(Node):
         self.robot1_pose_pub = self.create_publisher(
             Pose, 
             '/robot1/simple_pose', 
-            qos_best_effort
-        )
+            qos_best_effort,
+            callback_group=self.callback_group)
 
         # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
@@ -117,7 +117,9 @@ class VisitedHistoryPatrol(Node):
             10,
             callback_group=self.callback_group
         )
+
         # self.timer = self.create_timer(0.5, self.timer_callback)
+
         # 목표 지점 정의 (robot 1 좌표 기준)
         self.goal_options = [
             # 0 입구 (Entrance)
@@ -194,11 +196,23 @@ class VisitedHistoryPatrol(Node):
 
     # 분실물을 발견했는지 실시간 저장
     def detection_robot1_callback(self, msg):
-        self.detected_robot1 = msg.detected
-        self.goal = msg.goal
-
+        if msg.detected:
+            self.detected_robot1 = msg.detected
+            self.goal = msg.goal
+            self.navigator.cancelTask()
+            self.stop_robot() 
+            self.get_logger().info(f'please put your lost item on robot1 head')
+            time.sleep(7.0)
+            # 게이트로 이동
+            self.get_logger().info(f'go to {self.gate_name}')
+            self.navigator.startToPose(self.gate_pose)
+            while not self.navigator.isTaskComplete():
+                time.sleep(0.1)
     def detection_robot3_callback(self, msg):
-        self.detected_robot3 = msg.detected
+        if msg.detected:
+            self.detected_robot3 = msg.detected
+            self.navigator.cancelTask()
+            self.stop_robot() 
 
     # x,y,방향 값을 받아 PostStamped 형식으로 변환
     def create_pose(self, x, y, z_orient, w_orient):
@@ -257,10 +271,9 @@ class VisitedHistoryPatrol(Node):
         stop_msg.angular.z = 0.0
         
         # 확실하게 멈추기 위해 여러 번 publish
-        for _ in range(2):
-            self.get_logger().info("in stop robot pub*****")
+        for _ in range(10):
             self.cmd_vel_pub.publish(stop_msg)
-            time.sleep(1)
+            time.sleep(0.01)
 
     # 최단 경로 주행
     def run_patrol(self):
@@ -270,19 +283,6 @@ class VisitedHistoryPatrol(Node):
         if not self.visited_spot:
             self.navigator.info("No visited_spot provided. Exiting.")
             return
-
-        ################333
-        # timeout = 3.0  # 3초 타임아웃
-        # start_time = time.time()
-        # while self.current_pose is None:
-        #     if time.time() - start_time > timeout:
-        #         self.get_logger().warn('No amcl_pose received. Using default start position for testing.')
-        #         start_pose = self.create_pose(0.0,3.0, 0.9881, 0.1536)
-        #         break  # while 루프 탈출
-        #     self.get_logger().info('Waiting for current pose...')
-        #     rclpy.spin_once(self, timeout_sec=0.5)
-        # else:
-        #     start_pose = self.current_pose  # 로봇의 현재 위치 저장
 
         if self.current_pose is None:  
             self.get_logger().warn('Waiting for initial pose...')
@@ -303,11 +303,14 @@ class VisitedHistoryPatrol(Node):
 
         # 최적 경로를 따라 주행 시작
         for index in best_route:
+            if self.detected_robot1 or self.detected_robot3:
+                self.get_logger().info("Detection flag set! Stopping patrol.")
+                return
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
 
-            gate_name = self.gate_options[self.gate_id]['name']
-            gate_pose = self.gate_options[self.gate_id]['pose']
+            self.gate_name = self.gate_options[self.gate_id]['name']
+            self.gate_pose = self.gate_options[self.gate_id]['pose']
 
             self.navigator.info(f'Retracing path to {target_name}...')
             self.navigator.startToPose(target_pose)
@@ -318,19 +321,18 @@ class VisitedHistoryPatrol(Node):
                 if self.detected_robot3:
                     self.get_logger().info("robot3 detected")
                     self.navigator.cancelTask()
-                    self.stop_robot()    
+                    self.stop_robot() 
                     return
                 
                 # 자신이 분실물 인지했을 경우, 정지 후 접근 및 게이트로 이동
                 if self.detected_robot1:
                     self.get_logger().info("robot1 detected")
-                    self.navigator.cancelTask()
-                    self.stop_robot()       # 추후 접근으로 구현 필요
+                    # self.navigator.cancelTask()
+                    # self.stop_robot()       # 추후 접근으로 구현 필요
                     time.sleep(5.0)
                     # 게이트로 이동
-                    self.get_logger().info(f'go to {gate_name}')
-                    self.navigator.startToPose(gate_pose)
-
+                    self.get_logger().info(f'go to {self.gate_name}')
+                    self.navigator.startToPose(self.gate_pose)
                     while not self.navigator.isTaskComplete():
                         time.sleep(0.1)
                     return
@@ -379,7 +381,7 @@ def main(args=None):
                 tracer.registered = False 
                 tracer.search_mode = False 
                 # 탐색이 끝나면 프로그램 종료
-                break 
+                # break 
             
     except KeyboardInterrupt:
         pass

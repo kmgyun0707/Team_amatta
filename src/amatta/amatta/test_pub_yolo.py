@@ -1,13 +1,14 @@
 import rclpy
 from rclpy.node import Node
 from airport_guide_interfaces.msg import DetectionInfo
+import time
 
 class YoloPublisher(Node):
     def __init__(self):
         super().__init__('yolo_publisher')
         # /visited_spot 토픽 발행 설정
         ns =self.get_namespace()
-        self.publisher_ = self.create_publisher(Bool, f'{ns}/is_detected', 10)
+        self.publisher_ = self.create_publisher(DetectionInfo, f'{ns}/is_detected', 10)
         print("Detection Publisher Node Started.")
         print("-------------------------------------------------")
         print("탐지 여부를 입력하세요 (1: True / 0: False)")
@@ -30,7 +31,8 @@ class YoloPublisher(Node):
                 
                 # 토픽 발행
                 self.publisher_.publish(msg)
-                self.get_logger().info(f'Published /is_detected: {msg.data}')
+                time.sleep(0.01)
+                self.get_logger().info(f'Published /is_detected: {msg.detected}')
                     
         except KeyboardInterrupt:
             print("\n종료합니다.")
