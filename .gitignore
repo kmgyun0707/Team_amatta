@@ -5,3 +5,7 @@ log/
 maps/
 my_data/
 pts/
+img_capture/
+labels/
+src/turtlebot4_beep/
+turtlebot4_beep/
