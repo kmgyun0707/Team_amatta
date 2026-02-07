@@ -6,7 +6,7 @@ from rclpy.node import Node
 from airport_guide_interfaces.msg import SearchResult  # 위 msg 기준
 
 DB_PATH = "/home/rokey/Desktop/amatta/sql/amatta.db"
-TOPIC_NAME = "/search_result"
+TOPIC_NAME = "/is_found"
 
 class ResultListener(Node):
     def __init__(self):
