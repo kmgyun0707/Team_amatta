@@ -19,10 +19,11 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 
 # INPUTS (topics):
-# - /visited_spot (std_msgs/Int32MultiArray) : 사용자 이동 장소에 대한 번호 리스트 구독
 # - /search_mode (std_msgs/Bool) : 탐색 모드 실행 (False면 대기/ True면 탐색) 요청 구독
+# - /is_registered : 사용자 이동 장소에 대한 번호 리스트 구독
 # - /is_detected (std_msgs/Bool) : 분실물이 탐지 되었는지 bool 구독
 # - /robot1/amcl_pose (geometry_msgs/PoseWithCovarianceStamped) : 로봇 1의 현재 위치 구독
+# - /simple_pose: 
 # OUTPUTS (topics):
 # - /robot1/cmd_vel (geometry_msgs/Twist) : 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행
 
@@ -36,22 +37,19 @@ class VisitedHistoryPatrol(Node):
         self.navigator = TurtleBot4Navigator()
 
         # 토픽 수신 여부와 데이터를 저장할 변수 초기화
-        self.visited_spot = []          # 이동할 경로 리스트
-        self.registered = False         # db로부터 토픽을 수신했는지 여부
-        self.search_mode = False        # 탐색 모드 여부
+        self.search_mode = False            # 탐색 모드 여부
+        # self.registered = False             # DB로부터 토픽을 수신했는지 여부
+        self.visited_spots = []              # 이동할 경로 리스트
         self.detected_robot3 = False        # 분실물을 인지했는지 여부
         self.detected_robot1 = False
         self.current_pose = None 
         ns =self.get_namespace()
 
         # BEST_EFFORT 설정 정의
-        # - Reliability: BEST_EFFORT (전송 속도 우선, 유실 허용)
-        # - History: KEEP_LAST (최신 데이터 유지를 위해 필수)
-        # - Depth: 10 (버퍼 크기)
         qos_best_effort = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=10
+            reliability=ReliabilityPolicy.BEST_EFFORT,      # BEST_EFFORT (전송 속도 우선, 유실 허용)
+            history=HistoryPolicy.KEEP_LAST,                # KEEP_LAST (최신 데이터 유지를 위해 필수)
+            depth=10                                        # 버퍼 크기
         )
 
         ### Subscribers
@@ -71,11 +69,11 @@ class VisitedHistoryPatrol(Node):
             10,
             callback_group=self.callback_group)
 
-        # 로봇 1의 현재 위치 구독 -> 경로 생성 사용
+        # 로봇 자신의 현재 위치 구독 -> 경로 생성 사용
         self.subscription_pose = self.create_subscription(
             PoseWithCovarianceStamped,
             f'{ns}/amcl_pose',
-            self.pose_callback,
+            self.pose_callback,                 # 여기서 pose_pub 퍼블리시: 자기 자신의 위치를 받을 때마다 토픽으로 발행
             qos_best_effort,
             callback_group=self.callback_group)
 
@@ -96,14 +94,14 @@ class VisitedHistoryPatrol(Node):
             callback_group=self.callback_group)
         
         ### Publisher
-        ## 로봇1의 좌표 발행
-        self.robot1_pose_pub = self.create_publisher(
+        ## 로봇 자신의 좌표 발행 -> 상대 로봇이 로봇 간 거리 계산에 사용
+        self.pose_pub = self.create_publisher(
             Pose, 
-            '/robot3/simple_pose', # PC 변경으로 1->3 수정
+            '/another_robot_pose', # PC 변경으로 1->3 수정
             qos_best_effort,
             callback_group=self.callback_group)
 
-        # 로봇 1의 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
+        # 속도를 제어하기 위해 로봇의 /cmd_vel 발행 -> 로봇이 분실물 발견 시 정지
         self.cmd_vel_pub = self.navigator.create_publisher(
             Twist,
             f'{ns}/cmd_vel',
@@ -111,6 +109,7 @@ class VisitedHistoryPatrol(Node):
             callback_group=self.callback_group
         )
 
+        # 분실물 찾았는지 여부 발행 -> DB에 전달
         self.is_found_pub = self.navigator.create_publisher(
             Bool,
             f'{ns}/is_found',
@@ -120,83 +119,41 @@ class VisitedHistoryPatrol(Node):
 
         # self.timer = self.create_timer(0.5, self.timer_callback)
 
-        # 목표 지점 정의 (robot 1 좌표 기준)
+        # 목표 지점 정의
+        # robot 1 기준 좌표
         # self.goal_options = [
-        #     # 0 입구 (Entrance)
-        #     {'name': 'Entrance',
-        #     'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)},
-
-        #     # 1 은행 (Bank)
-        #     {'name': 'Bank',
-        #     'pose': self.create_pose(-2.39, 3.15, 0.4327, 0.9015)},
-
-        #     # 2 카운터 (Counter)
-        #     {'name': 'Counter',
-        #     'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)},
-
-        #     # 3 벤치1 (Bench 1)
-        #     {'name': 'Bench_1',
-        #     'pose': self.create_pose(-0.54, 2.12, -0.7689, 0.6394)},
-
-        #     # 4 벤치2 (Bench 2)
-        #     {'name': 'Bench_2',
-        #     'pose': self.create_pose(-0.83, 0.80, 0.58, 0.8146)},
-
-        #     # 5 여자화장실 (Ladies Room)
-        #     {'name': 'Ladies_Room',
-        #     'pose': self.create_pose(-0.486, -0.75, -0.1166, 0.9931)},
-
-        #     # 6 면세점 (Duty Free)
-        #     {'name': 'Duty_Free',
-        #     'pose': self.create_pose(-1.99, 0.82, -0.9927, 0.1203)},
-
-        #     # 7 남자화장실 (Mens Room)
-        #     {'name': 'Mens_Room',
-        #     'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
+        #     {'name': 'Entrance', 'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)},
+        #     {'name': 'Bank', 'pose': self.create_pose(-2.39, 3.15, 0.4327, 0.9015)},
+        #     {'name': 'Counter', 'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)},
+        #     {'name': 'Bench_1', 'pose': self.create_pose(-0.54, 2.12, -0.7689, 0.6394)},
+        #     {'name': 'Bench_2', 'pose': self.create_pose(-0.83, 0.80, 0.58, 0.8146)},
+        #     {'name': 'Ladies_Room', 'pose': self.create_pose(-0.486, -0.75, -0.1166, 0.9931)},
+        #     {'name': 'Duty_Free', 'pose': self.create_pose(-1.99, 0.82, -0.9927, 0.1203)},
+        #     {'name': 'Mens_Room', 'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
         # ]
-        #로봇3 기준 좌표
+        # self.gate_options = [
+        #     {'name': 'Gate_1', 'pose': self.create_pose(-0.60, -1.31, -0.6276, 0.7785)},
+        #     {'name': 'Gate_2', 'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
+        # ]
+
+        # robot 3 기준 좌표
         self.goal_options = [
-            # 0 입구 (Entrance)
-            {'name': 'Entrance',
-             'pose': self.create_pose(-3.26, 3.77, 0.9881, 0.1536)},
-
-            # 1 은행 (Bank)
-            {'name': 'Bank',
-             'pose': self.create_pose(-2.08, 3.45, 0.4327, 0.9015)},
-
-            # 2 카운터 (Counter)
-            {'name': 'Counter',
-             'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)},
-
-            # 3 벤치1 (Bench 1)
-            {'name': 'Bench_1',
-             'pose': self.create_pose(-0.791, 2.19, -0.7689, 0.6394)},
-
-            # 4 벤치2 (Bench 2)
-            {'name': 'Bench_2',
-             'pose': self.create_pose(-0.672, 0.615, 0.58, 0.8146)},
-
-            # 5 여자화장실 (Ladies Room)
-            {'name': 'Ladies_Room',
-             'pose': self.create_pose(-0.547, -0.636, -0.1166, 0.9931)},
-
-            # 6 면세점 (Duty Free)
-            {'name': 'Duty_Free',
-             'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
-
-            # 7 남자화장실 (Mens Room)
-            {'name': 'Mens_Room',
-             'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
+            {'name': 'Entrance', 'pose': self.create_pose(-3.26, 3.77, 0.9881, 0.1536)},
+            {'name': 'Bank', 'pose': self.create_pose(-2.08, 3.45, 0.4327, 0.9015)},
+            {'name': 'Counter', 'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)},
+            {'name': 'Bench_1', 'pose': self.create_pose(-0.791, 2.19, -0.7689, 0.6394)},
+            {'name': 'Bench_2', 'pose': self.create_pose(-0.672, 0.615, 0.58, 0.8146)},
+            {'name': 'Ladies_Room', 'pose': self.create_pose(-0.547, -0.636, -0.1166, 0.9931)},
+            {'name': 'Duty_Free', 'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
+            {'name': 'Mens_Room', 'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
         ]
+
         self.gate_options = [
-            # 0 Gate 1
-            {'name': 'Gate_1',
-            'pose': self.create_pose(-0.60, -1.31, -0.6276, 0.7785)},
-
-            # 1 Gate 2
-            {'name': 'Gate_2',
-            'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
+            {'name': 'Gate_1', 'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
+            {'name': 'Gate_2', 'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
         ]
+
+        
 
         ####################### 에러 뜨는지 확인 ########################
         # 1. 초기화 및 Docking 상태 확인
@@ -220,23 +177,23 @@ class VisitedHistoryPatrol(Node):
         else:
             self.get_logger().info("Search mode deactivated. Waiting...")
             
-    # visited_spot 토픽이 들어오면 실행 / 사용자 이동 내역을 리스트 형태로 저장
+    # /is_registered 토픽이 들어오면 실행, 사용자 이동 내역을 리스트 형태로 저장
     def topic_callback(self, msg):
-        self.visited_spot= list(msg.visited_spots)
-        self.gate_id = msg.gate_id - 8      # 게이트 1, 2이 8, 9로 들어오기 때문에 gate_options 인덱스에 맞게 빼줌
-        self.registered = msg.registered
-        self.get_logger().info(f"Topic Received! gate : {self.gate_id}, registered : {self.registered}")
-        self.get_logger().info(f"Topic Received! visited spot : {self.visited_spot}")
+        self.visited_spots= list(msg.visited_spots)
+        self.gate_id = msg.gate_id - 8                      # 게이트 1, 2이 DB에서 8, 9로 들어오기 때문에 gate_options 인덱스에 맞게 빼줌
+        # self.registered = msg.registered
+        self.get_logger().info(f"Topic Received! visited spot : {self.visited_spots}, gate : {self.gate_id}")
 
     # amcl_pose토픽에서 좌표와 방향만 필요하기 때문에 PoseStamped 규격으로 필요한 정보만 저장
     def pose_callback(self, msg):
         self.current_pose = PoseStamped()
-        self.current_pose.header = msg.header
+        # self.current_pose.header = msg.header
         self.current_pose.pose = msg.pose.pose
         if self.current_pose is not None:
             self.get_logger().info(f"Pose Received!")
-            self.robot1_pose_pub.publish(self.current_pose.pose)
+            self.pose_pub.publish(self.current_pose.pose)
 
+    # 클린 코드를 위해 추후 timer로 발행 고려하기
     # def timer_callback(self): 
     #     if self.current_pose is None:
     #         return
@@ -377,8 +334,8 @@ class VisitedHistoryPatrol(Node):
         self.navigator.info('Initializing User History Tracer...')
 
         # 사용자 이동 내역이 없을 경우 종료
-        if not self.visited_spot:
-            self.navigator.info("No visited_spot provided. Exiting.")
+        if not self.visited_spots:
+            self.navigator.info("No visited_spots provided. Exiting.")
             return
 
         if self.current_pose is None:  
@@ -391,7 +348,7 @@ class VisitedHistoryPatrol(Node):
         
         start_pose = self.current_pose
         self.navigator.info('Calculating best route to retrace steps...')
-        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spot)     # 최적 경로 계산
+        best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spots)     # 최적 경로 계산
 
         path_names = [self.goal_options[i]['name'] for i in best_route]
         print("\n" + "*"*50)
@@ -473,9 +430,10 @@ def main(args=None):
     try:
         while rclpy.ok():
             # 데이터를 받으면 순찰 시작
-            if tracer.search_mode and not tracer.registered and len(tracer.visited_spot) > 0:       # visited_spot 값이 늦게 도착할 경우를 대비하여 조건 추가
+            if tracer.search_mode and len(tracer.visited_spots) > 0:       # visited_spot 값이 늦게 도착할 경우를 대비하여 조건 추가
+            # if tracer.search_mode and not tracer.registered and len(tracer.visited_spots) > 0:       # visited_spot 값이 늦게 도착할 경우를 대비하여 조건 추가
                 tracer.run_patrol()
-                tracer.registered = False 
+                # tracer.registered = False 
                 tracer.search_mode = False 
                 # 탐색이 끝나면 프로그램 종료
                 # break 

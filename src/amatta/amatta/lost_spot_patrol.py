@@ -77,7 +77,7 @@ class LostItemPatrol(Node):
         #### 로봇1 좌표만 구독
         self.pose_robot1_sub= self.create_subscription(
             Pose,
-            '/robot3/simple_pose',          # PC 변경으로 1->3 수정
+            '/another_robot_pose',          # PC 변경으로 1->3 수정
             self.robot1_pose_callback,
             qos_best_effort,
             callback_group=self.callback_group)
@@ -124,74 +124,37 @@ class LostItemPatrol(Node):
 
         # 목표 지점 정의 (robot 3 좌표 기준)
         # self.goal_options = [
-        #     # 0 입구 (Entrance)
-        #     {'name': 'Entrance',
-        #      'pose': self.create_pose(-3.26, 3.77, 0.9881, 0.1536)},
-
-        #     # 1 은행 (Bank)
-        #     {'name': 'Bank',
-        #      'pose': self.create_pose(-2.08, 3.45, 0.4327, 0.9015)},
-
-        #     # 2 카운터 (Counter)
-        #     {'name': 'Counter',
-        #      'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)},
-
-        #     # 3 벤치1 (Bench 1)
-        #     {'name': 'Bench_1',
-        #      'pose': self.create_pose(-0.791, 2.19, -0.7689, 0.6394)},
-
-        #     # 4 벤치2 (Bench 2)
-        #     {'name': 'Bench_2',
-        #      'pose': self.create_pose(-0.672, 0.615, 0.58, 0.8146)},
-
-        #     # 5 여자화장실 (Ladies Room)
-        #     {'name': 'Ladies_Room',
-        #      'pose': self.create_pose(-0.547, -0.636, -0.1166, 0.9931)},
-
-        #     # 6 면세점 (Duty Free)
-        #     {'name': 'Duty_Free',
-        #      'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
-
-        #     # 7 남자화장실 (Mens Room)
-        #     {'name': 'Mens_Room',
-        #      'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
+        #     {'name': 'Entrance', 'pose': self.create_pose(-3.26, 3.77, 0.9881, 0.1536)},
+        #     {'name': 'Bank', 'pose': self.create_pose(-2.08, 3.45, 0.4327, 0.9015)},
+        #     {'name': 'Counter', 'pose': self.create_pose(-0.584, 3.64, -0.7689, 0.6394)},
+        #     {'name': 'Bench_1', 'pose': self.create_pose(-0.791, 2.19, -0.7689, 0.6394)},
+        #     {'name': 'Bench_2', 'pose': self.create_pose(-0.672, 0.615, 0.58, 0.8146)},
+        #     {'name': 'Ladies_Room', 'pose': self.create_pose(-0.547, -0.636, -0.1166, 0.9931)},
+        #     {'name': 'Duty_Free', 'pose': self.create_pose(-2.35, 0.799, 0.7177, 0.6963)},
+        #     {'name': 'Mens_Room', 'pose': self.create_pose(-3.16, 2.58, 0.7177, 0.6963)}
         # ]
-        # # robot 1 기준 좌표
-        self.goal_options = [
-            # 0 입구 (Entrance)
-            {'name': 'Entrance',
-            'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)},
-            # 1 은행 (Bank)
-            {'name': 'Bank',
-            'pose': self.create_pose(-2.39, 3.15, 0.4327, 0.9015)},
-            # 2 카운터 (Counter)
-            {'name': 'Counter',
-            'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)},
-            # 3 벤치1 (Bench 1)
-            {'name': 'Bench_1',
-            'pose': self.create_pose(-0.54, 2.12, -0.7689, 0.6394)},
-            # 4 벤치2 (Bench 2)
-            {'name': 'Bench_2',
-            'pose': self.create_pose(-0.83, 0.80, 0.58, 0.8146)},
-            # 5 여자화장실 (Ladies Room)
-            {'name': 'Ladies_Room',
-            'pose': self.create_pose(-0.486, -0.75, -0.1166, 0.9931)},
-            # 6 면세점 (Duty Free)
-            {'name': 'Duty_Free',
-            'pose': self.create_pose(-1.99, 0.82, -0.9927, 0.1203)},
-            # 7 남자화장실 (Mens Room)
-            {'name': 'Mens_Room',
-            'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
-        ]
-        self.gate_options = [
-            # 0번 인덱스: Gate 1
-            {'name': 'Gate_1',
-             'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
+        # self.gate_options = [
+        #     {'name': 'Gate_1', 'pose': self.create_pose(-0.76, -1.59, 0.9881, 0.1536)},
+        #     {'name': 'Gate_2', 'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
+        # ]
 
-            # 1번 인덱스: Gate 2
-            {'name': 'Gate_2',
-             'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
+        # robot 1 기준 좌표
+        self.goal_options = [
+            {'name': 'Entrance', 'pose': self.create_pose(-3.26, 3.71, 0.9881, 0.1536)},
+            {'name': 'Bank', 'pose': self.create_pose(-2.39, 3.15, 0.4327, 0.9015)},
+            {'name': 'Counter', 'pose': self.create_pose(-0.54, 3.64, 0.7177, 0.6963)},
+            {'name': 'Bench_1', 'pose': self.create_pose(-0.54, 2.12, -0.7689, 0.6394)},
+            {'name': 'Bench_2', 'pose': self.create_pose(-0.83, 0.80, 0.58, 0.8146)},
+            {'name': 'Ladies_Room', 'pose': self.create_pose(-0.486, -0.75, -0.1166, 0.9931)},
+            {'name': 'Duty_Free', 'pose': self.create_pose(-1.99, 0.82, -0.9927, 0.1203)},
+            {'name': 'Mens_Room', 'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
         ]
+
+        self.gate_options = [
+            {'name': 'Gate_1', 'pose': self.create_pose(-0.60, -1.31, -0.6276, 0.7785)},
+            {'name': 'Gate_2', 'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
+        ]
+        
 
          # 1. 초기화 및 Docking 상태 확인
         if not self.navigator.getDockedStatus():

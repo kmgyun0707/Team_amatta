@@ -89,7 +89,7 @@ class GuideToInfo(Node):
         if self.registered:
             self.get_logger().info(f'Guide to Counter...')
             self.handle_registration = True                                         # 불필요한 중복 명령 방지를 위해 콜백 비활성화
-            self.navigator.startToPose(self.target_pose_robot3[0]['pose'])          # 카운터로 이동
+            self.navigator.startToPose(self.target_pose_robot3[0]['pose'])          # 카운터로 이동 (robot3으로 실행 시 robot3 좌표값 사용)
 
             while not self.navigator.isTaskComplete():                              # 내비게이션 태스크가 완료(성공, 실패, 취소)될 때까지 반복
                 if not rclpy.ok():                                                  # 프로그램이 강제 종료(Ctrl+C)되었는지 확인
