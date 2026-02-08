@@ -263,21 +263,21 @@ class Detect_to_Lossitem(Node):
 
 def main(args=None):
 
-    # [추가]네임스페이스 및 TF 리매핑 설정 
-    import sys
+#     # [추가]네임스페이스 및 TF 리매핑 설정 
+#     import sys
 
-    if args is None:
-        args = sys.argv
-    if '--ros-args'not in args:
-        args.append('--ros-args')
-    args.append('-r')
-    args.append('__ns:=/robot1')  # 네임스페이스 설정
+#     if args is None:
+#         args = sys.argv
+#     if '--ros-args'not in args:
+#         args.append('--ros-args')
+#     args.append('-r')
+#     args.append('__ns:=/robot1')  # 네임스페이스 설정
     
-    args.append('-r')
-    args.append('/tf:=/robot1/tf')  # tf 토픽 네임스페이스 설정
-    args.append('-r')
-    args.append('/tf_static:=/robot1/tf_static')  # tf_static 토
-######################################################################
+#     args.append('-r')
+#     args.append('/tf:=/robot1/tf')  # tf 토픽 네임스페이스 설정
+#     args.append('-r')
+#     args.append('/tf_static:=/robot1/tf_static')  # tf_static 토
+# ######################################################################
 
     # 경로 확인 비판: 파일이 실제로 있는지 확인하는 로직을 넣으면 더 좋습니다.
     model_path = '/home/rokey/Desktop/Team_amatta/model/260207_yolo11n.pt'
