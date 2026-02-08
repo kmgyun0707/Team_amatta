@@ -61,7 +61,7 @@ class Detect_to_Lossitem(Node):
         self.rgb_sub = message_filters.Subscriber(self, CompressedImage, f'{self.name_space}/oakd/rgb/image_raw/compressed',qos_profile=qos_profile)
         self.depth_sub = message_filters.Subscriber(self, Image, f'{self.name_space}/oakd/stereo/image_raw',qos_profile=qos_profile)
         # slop은 환경에 따라 0.05~0.2 사이에서 조절하세요.
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 100, 0.5) #수정 
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 100, 0.1) #수정 
         self.ts.registerCallback(self.synchronized_callback)
      
         self.is_detected = self.create_publisher(DetectionInfo, f'{self.name_space}/is_detected',10) # 이건 네임스페이스 없이 발행
@@ -121,9 +121,9 @@ class Detect_to_Lossitem(Node):
                         label_name = self.classNames[int(box.cls[0])] if int(box.cls[0]) < len(self.classNames) else "Unknown" # 클래스 이름
 
                         # [수정3] 'bag' 클래스 제외 로직 추가
-                        if label_name == 'bag':
+                        if label_name == 'bag' or label_name == 'phone':
                             continue
-                        
+
                         confidence = float(box.conf[0]) # 신뢰도
 
                         # 이미지 범위 체크 (IndexError 방지)
@@ -216,14 +216,15 @@ class Detect_to_Lossitem(Node):
                             goal_pose.pose.orientation.w = 1.0  # 방향 설정 (회전 없음) -> 아마 이거 없어서 명령이 안먹혔던 것 같음 [추가]
 
                             self.goal = goal_pose # 목표 위치 저장
-
-                            # 발행할 메시지
-                            detect_msg = DetectionInfo() 
-                            detect_msg.goal = self.goal # 목표 위치 포함 )
-                            detect_msg.detected = self.detected # 탐지 여부 포함 
-                            self.is_detected.publish(detect_msg)# /is_detected 발행
                             
                             if not self.goal_sent:  # 목표가 아직 전송되지 않은 경우에만
+                                # 발행할 메시지
+                                detect_msg = DetectionInfo() 
+                                detect_msg.goal = self.goal # 목표 위치 포함 )
+                                detect_msg.detected = self.detected # 탐지 여부 포함 
+                                self.is_detected.publish(detect_msg)# /is_detected 발행
+                            
+                            
                                 self.goal_sent = True  # 목표가 전송되었음을 표시
                                 # self.navigator.startToPose(detect_msg.goal) # 내비게이션 시작
                             # 검출 정보 로깅
