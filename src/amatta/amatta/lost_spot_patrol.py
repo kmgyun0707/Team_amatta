@@ -144,45 +144,51 @@ class LostItemPatrol(Node):
 
     def detection_self_callback(self, msg):
         # # [수정] 감지되어도 아무 동작 안 하고 무시하도록 변경 (경로 생성 알고리즘 검증용, 추후 제거 필요)
-        # if msg.detected:
-        #     self.get_logger().info(f"Robot 1 DETECTED something, but IGNORING it to continue path.")
-        #     return
+        if msg.detected:
+            # self.get_logger().info(f"Robot 1 DETECTED something, but IGNORING it to continue path.")
+            return
         
-        self.goal_x = msg.goal.pose.position.x
-        self.goal_y = msg.goal.pose.position.y
+        # 아래 로직들 모두 주석 처리하여 실행되지 않게 함
+        # self.goal_x = msg.goal.pose.position.x
+        # self.goal_y = msg.goal.pose.position.y
 
-        # self.offset_goal_pose = self.get_offset_pose(self.goal_x, self.goal_y, offset_dist=0.6) # offset_dist 튜닝 필요: dist 절반 시도해보기
+        # # self.offset_goal_pose = self.get_offset_pose(self.goal_x, self.goal_y, offset_dist=0.6) # offset_dist 튜닝 필요: dist 절반 시도해보기
 
-        temp_target_pose = self.create_pose(self.goal_x, self.goal_y, 0.0, 1.0)
-        self.offset_goal_pose = self.get_offset_pose(temp_target_pose, offset_dist=0.6)
+        # temp_target_pose = self.create_pose(self.goal_x, self.goal_y, 0.0, 1.0)
+        # self.offset_goal_pose = self.get_offset_pose(temp_target_pose, offset_dist=0.6)
 
-        if msg.detected and not self.detected_self:
-            self.get_logger().info("I (Robot 1) FOUND IT! Stopping.")
-            self.detected_self = True
-            self.navigator.cancelTask()
-            self.stop_robot()
+        # if msg.detected and not self.detected_self:
+        #     self.get_logger().info("I (Robot 1) FOUND IT! Stopping.")
+        #     self.detected_self = True
+        #     self.navigator.cancelTask()
+        #     self.stop_robot()
 
-            # 분실물에 접근
-            self.get_logger().info(f'close to stuff')
-            self.navigator.startToPose(self.offset_goal_pose)
-            while not self.navigator.isTaskComplete():
-                time.sleep(0.1)
+        #     # 분실물에 접근
+        #     self.get_logger().info(f'close to stuff')
+        #     self.navigator.startToPose(self.offset_goal_pose)
+        #     while not self.navigator.isTaskComplete():
+        #         time.sleep(0.1)
             
-            # 분실물 수거 기다리기
-            self.get_logger().info(f'please put your lost item on robot3 head')
-            time.sleep(5.0)  
+        #     # 분실물 수거 기다리기
+        #     self.get_logger().info(f'please put your lost item on robot3 head')
+        #     time.sleep(5.0)  
             
-            # 게이트로 이동
-            self.navigator.startToPose(self.gate_pose)
-            while not self.navigator.isTaskComplete():
-                time.sleep(0.1)
+        #     # 게이트로 이동
+        #     self.navigator.startToPose(self.gate_pose)
+        #     while not self.navigator.isTaskComplete():
+        #         time.sleep(0.1)
 
     def detection_peer_callback(self, msg):
-        if msg.detected and not self.detected_peer:
-            self.get_logger().info("Robot 3 FOUND IT! I will stop.")
-            self.detected_peer = True
-            self.navigator.cancelTask()
-            self.stop_robot()
+        # [수정] 동료 로봇이 감지해도 아무 동작 안 하고 무시하도록 변경
+        if msg.detected:
+            #  self.get_logger().info(f"Robot 3 detected something, but Robot 1 is IGNORING it.")
+             return
+        
+        # if msg.detected and not self.detected_peer:
+        #     self.get_logger().info("Robot 3 FOUND IT! I will stop.")
+        #     self.detected_peer = True
+        #     self.navigator.cancelTask()
+        #     self.stop_robot()
     
     # 수정된 get_offset_pose
     def get_offset_pose(self, target_pose, offset_dist=0.6):
@@ -241,16 +247,17 @@ class LostItemPatrol(Node):
 
 
         # best_route, _ = self.find_best_route_brute_force(start_pose, self.target_indices)
-        best_route, _ = self.find_best_route_using_nav2(start_pose, self.target_indices)
+        best_route = route_nav
         
         path_names = [self.goal_options[i]['name'] for i in best_route]
         self.get_logger().info(f"Patrol Route: {' -> '.join(path_names)}")
 
         for index in best_route:
-            # 1. 시작 전 종료 조건 확인
-            if self.detected_self or self.detected_peer:
-                self.reset_state()
-                return
+            # -> [수정] 감지되어도 무시하므로 주석 처리
+            # # 1. 시작 전 종료 조건 확인
+            # if self.detected_self or self.detected_peer:
+            #     self.reset_state()
+            #     return
 
             target_name = self.goal_options[index]['name']
             target_pose = self.goal_options[index]['pose']
@@ -260,12 +267,13 @@ class LostItemPatrol(Node):
 
             # 2. 이동 중 감시 루프
             while not self.navigator.isTaskComplete():
-                # [종료 조건] 누군가 찾음
-                if self.detected_self or self.detected_peer:
-                    self.navigator.cancelTask()
-                    self.stop_robot()
-                    self.reset_state()
-                    return
+                # [수정] 종료 조건(감지 시 정지) 삭제 -> 무조건 완주
+                # # [종료 조건] 누군가 찾음
+                # if self.detected_self or self.detected_peer:
+                #     self.navigator.cancelTask()
+                #     self.stop_robot()
+                #     self.reset_state()
+                #     return
 
                 # [충돌 방지] Robot 3와 거리 체크
                 if self.check_proximity_and_yield():
@@ -311,7 +319,8 @@ class LostItemPatrol(Node):
 
             # 멀어질 때까지 대기
             while dist < safe_dist:
-                if self.detected_self or self.detected_peer: return False # 대기 중 발견 시 탈출
+                # [수정] 대기 중 발견해도 탈출 안함 (계속 대기하다가 길 비키면 이동)
+                # if self.detected_self or self.detected_peer: return False # 대기 중 발견 시 탈출
                 
                 # 위치 업데이트 후 다시 계산
                 if self.peer_pose and self.current_pose:
