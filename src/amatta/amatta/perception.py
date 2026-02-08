@@ -37,6 +37,12 @@ class Detect_to_Lossitem(Node):
         self.model = model
         self.classNames = model.names
         self.K = None
+
+        # [추가2] 연속 검출 확인을 위한 변수 초기화
+        self.consecutive_frames = 0       # 연속 검출 횟수 카운터
+        self.last_detected_label = None   # 직전 프레임에서 검출된 객체 이름
+        self.target_frame_count = 6       # 목표 연속 프레임 수 (3프레임)
+        self.last_box = None # [추가2] 이전 프레임 바운딩 박스 저장용 변수
         
         # __init__ 내부 수정
         qos_profile = QoSProfile(
@@ -64,6 +70,7 @@ class Detect_to_Lossitem(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
         self.detected = False
+        current_frame_has_valid_obj = False # # [추가2] 이번 프레임에서 유효한 객체를 찾았는지 플래그
         self.get_logger().info('구독 및 필터 설정 완료. 데이터를 기다리는 중...')
         self.goal_sent = False #[추가] 목표가 전송되었는지 여부 추적 변수
 
@@ -100,7 +107,7 @@ class Detect_to_Lossitem(Node):
                 self.detected = False
                 for r in results: # 각 프레임에 대한 결과
                     if len(r.boxes) == 0: # 검출된 객체가 없으면 건너뜀 - 추가 
-                        self.get_logger().info("검출된 객체 없음") # 로그 추가
+                        self.get_logger().info("검출된 객체 없음", throttle_duration_sec=0.5) # 로그 추가
                         continue
                     self.detected = True #[추가] 탐지 됐다고 true해야하는데 아예빠져있어서 추가... 빠져있던 부분...
                     sorted_boxes = sorted(r.boxes, key=lambda b: b.conf[0], reverse=True)#각 객체가 아닌 제일 신뢰도가 높은 객체 하나만 처리하도록 [수정]
@@ -109,6 +116,8 @@ class Detect_to_Lossitem(Node):
                         cx, cy = (x1 + x2) // 2, (y1 + y2) // 2 #중심점
 
                         cls_id = int(box.cls[0]) # 클래스 ID
+                        # [추가2] 현재 박스 좌표 저장 (IoU 계산용)
+                        current_box = [x1, y1, x2, y2]
                         label_name = self.classNames[int(box.cls[0])] if int(box.cls[0]) < len(self.classNames) else "Unknown" # 클래스 이름
                         confidence = float(box.conf[0]) # 신뢰도
 
@@ -122,8 +131,57 @@ class Detect_to_Lossitem(Node):
                         z = float(np.median(depth_values)) / 1000.0 # 깊이 값 (mm -> m)
 
                         #확인 로그 추가
-                        self.get_logger().info(f'검출된 객체: {label_name}, 신뢰도: {confidence}, 깊이 값(z): {z}m')
+                        # self.get_logger().info(f'검출된 객체: {label_name}, 신뢰도: {confidence}, 깊이 값(z): {z}m')
                         if z <= 0.1 or z > 2.2: # 유효 거리 범위 체크 (0.1m ~ 5.0m) 
+                            continue
+
+                        # [추가2] 연속 검출 로직 시작 ===
+                        current_frame_has_valid_obj = True # 유효한 객체 있음
+
+                        # === [추가2] IoU 기반 트래킹 및 연속 검출 로직 수정 시작 ===
+                        is_same_object = False
+
+                        if label_name == self.last_detected_label:
+                            # 2. 이전 박스 정보가 있다면 IoU 계산
+                            if self.last_box is not None:
+                                # 교차 영역(Intersection) 계산
+                                xi1 = max(self.last_box[0], current_box[0])
+                                yi1 = max(self.last_box[1], current_box[1])
+                                xi2 = min(self.last_box[2], current_box[2])
+                                yi2 = min(self.last_box[3], current_box[3])
+                                
+                                inter_area = max(0, xi2 - xi1) * max(0, yi2 - yi1)
+                                
+                                # 합집합 영역(Union) 계산
+                                box1_area = (self.last_box[2] - self.last_box[0]) * (self.last_box[3] - self.last_box[1])
+                                box2_area = (current_box[2] - current_box[0]) * (current_box[3] - current_box[1])
+                                union_area = box1_area + box2_area - inter_area
+                                
+                                iou = inter_area / union_area if union_area > 0 else 0
+                                
+                                # IoU 임계값 (예: 0.3 -> 30% 이상 겹쳐야 같은 물체로 인정)
+                                if iou > 0.3:
+                                    is_same_object = True
+                                else:
+                                    # 이름은 같지만 위치가 너무 다르면(IoU 낮음) 새로운 객체로 취급
+                                    is_same_object = False
+                            else:
+                                # 이전 박스 정보가 없으면(첫 프레임 등) 이름만 같으면 인정
+                                is_same_object = True
+
+                        if is_same_object:
+                            self.consecutive_frames += 1
+                        else:
+                            # 다른 객체이거나 위치가 튀었으면 카운트 리셋 (새로운 트래킹 시작)
+                            self.consecutive_frames = 1
+                            self.last_detected_label = label_name
+                        
+                        # 현재 박스를 다음 프레임 비교를 위해 저장
+                        self.last_box = current_box
+                        # === [추가2] 로직 끝 ===
+                        
+                        # 3프레임 이상 연속 검출되지 않았으면 좌표 변환 및 발행 스킵
+                        if self.consecutive_frames < self.target_frame_count:
                             continue
 
                         # 3. 2D->3D 좌표 변환
@@ -143,7 +201,7 @@ class Detect_to_Lossitem(Node):
                             pt_map = self.tf_buffer.transform(pt_camera, target_frame, timeout=Duration(seconds=1.0)) # 'map' 프레임으로 변환
 
                             #좌표 변환 성공 로그
-                            self.get_logger().info(f'TF 변환 성공: {pt_camera.point.x:.2f}, {pt_camera.point.y:.2f} -> {pt_map.point.x:.2f}, {pt_map.point.y:.2f}')
+                            # self.get_logger().info(f'TF 변환 성공: {pt_camera.point.x:.2f}, {pt_camera.point.y:.2f} -> {pt_map.point.x:.2f}, {pt_map.point.y:.2f}')
                             goal_pose = PoseStamped() # 목표 위치 생성
                             goal_pose.header.frame_id = 'map' # 'map' 프레임 
                             goal_pose.header.stamp = self.get_clock().now().to_msg() # 현재 시간
@@ -184,6 +242,12 @@ class Detect_to_Lossitem(Node):
                             self.get_logger().info(f'📜 현재 TF 족보: {self.tf_buffer.all_frames_as_string()}')
 
                             continue
+
+                        # [추가2] 이번 프레임에서 아무런 유효 객체도 못 찾았다면 카운터 초기화
+                        if not current_frame_has_valid_obj:
+                            self.consecutive_frames = 0
+                            self.last_detected_label = None
+                            
                 # 4. 결과 발행 및 성능 로그
                 out_msg = self.bridge.cv2_to_imgmsg(rgb_img, encoding="bgr8") # OpenCV 이미지 -> ROS Image 메시지
                 self.loss_item_view_pub.publish(out_msg) # 시각화 이미지 발행
@@ -216,7 +280,7 @@ def main(args=None):
 ######################################################################
 
     # 경로 확인 비판: 파일이 실제로 있는지 확인하는 로직을 넣으면 더 좋습니다.
-    model_path = '/home/rokey/Desktop/Team_amatta/model/model2.pt'
+    model_path = '/home/rokey/Desktop/Team_amatta/model/260207_yolo11n.pt'
     model = YOLO(model_path)
     
     rclpy.init(args=args)
