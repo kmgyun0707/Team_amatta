@@ -145,8 +145,29 @@ class VisitedHistoryPatrol(Node):
         if msg.detected and not self.detected_robot3:
             self.get_logger().info("ROBOT 3 DETECTED ITEM!")
             self.detected_robot3 = True
+
+            self.item_location = msg.goal
+
             self.navigator.cancelTask()
             self.stop_robot()
+
+            # 접근 (이제 self.item_location이 None이 아니므로 에러가 나지 않습니다)
+            if self.item_location is not None:
+                approach_pose = self.get_offset_pose(self.item_location, 0.6)
+                self.navigator.startToPose(approach_pose)
+                while not self.navigator.isTaskComplete(): time.sleep(0.1)
+                
+                # 대기
+                self.get_logger().info("Waiting for load...")
+                time.sleep(7.0)
+                
+                # 게이트 이동
+                if self.gate_pose:
+                    self.get_logger().info(f"Going to Gate...")
+                    self.navigator.startToPose(self.gate_pose)
+                    while not self.navigator.isTaskComplete(): time.sleep(0.1)
+            else:
+                self.get_logger().error("Detected item but location is None")
 
     # ---------------- Control Logic ----------------
 
@@ -197,19 +218,20 @@ class VisitedHistoryPatrol(Node):
                 return
 
             target_pose = self.goal_options[index]['pose']
-            self.navigator.goToPose(target_pose)
+            self.navigator.startToPose(target_pose)
 
             # 이동 중 감시 루프
             while not self.navigator.isTaskComplete():
                 if self.detected_robot1:
                     self.navigator.cancelTask()
                     self.stop_robot()
-                    self.handle_retrieval_sequence()
+                    # self.handle_retrieval_sequence()
                     self.reset_state()
                     return
                 if self.detected_robot3:
                     self.navigator.cancelTask()
                     self.stop_robot()
+                    self.handle_retrieval_sequence()
                     self.reset_state()
                     return
                 time.sleep(0.1)
@@ -294,7 +316,7 @@ class VisitedHistoryPatrol(Node):
         
         # 접근
         approach_pose = self.get_offset_pose(self.item_location, 0.6)
-        self.navigator.goToPose(approach_pose)
+        self.navigator.startToPose(approach_pose)
         while not self.navigator.isTaskComplete(): time.sleep(0.1)
         
         # 대기
@@ -304,7 +326,7 @@ class VisitedHistoryPatrol(Node):
         # 게이트 이동
         if self.gate_pose:
             self.get_logger().info(f"Going to Gate...")
-            self.navigator.goToPose(self.gate_pose)
+            self.navigator.startToPose(self.gate_pose)
             while not self.navigator.isTaskComplete(): time.sleep(0.1)
 
 def main(args=None):
