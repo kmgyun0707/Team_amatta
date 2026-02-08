@@ -9,7 +9,8 @@ from web.user_load_db import user_load_db_bp
 from web.lost_report import lost_report_bp
 from web.guide_start import guide_start_bp
 from web.search_start import search_start_bp 
-from found_item_listener import main
+from web.ad_graph import ad_graph_bp 
+# from api_test import main
 
 
 BASE_DIR = "/home/rokey/Desktop/amatta"   # 너 프로젝트 루트
@@ -19,7 +20,7 @@ def create_app():
         __name__,
         template_folder="/home/rokey/Desktop/amatta/template",
         static_folder="/home/rokey/Desktop/amatta/static",
-        static_url_path="/static"
+        static_url_path="/static" 
     )
     app.secret_key = "amatta"   # data 보호, 쿠키 수정 불가
 
@@ -32,11 +33,12 @@ def create_app():
     app.register_blueprint(ad_login_bp)         # /ad_login(get,post), /logout
     app.register_blueprint(ad_load_db_bp)       # /ad_load_db
     app.register_blueprint(ad_detect_bp)        # /ad_detect
+    app.register_blueprint(ad_graph_bp)
 
     return app
 
 
 if __name__ == "__main__":
     app = create_app()
-    threading.Thread(target=main, daemon=True).start()
+    # threading.Thread(target=main, daemon=True).start()
     app.run(host="0.0.0.0", port=5000, debug=True)  # 5000port에서 열림

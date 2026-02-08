@@ -1,0 +1,207 @@
+<!-- template/ad_graph.html -->
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>분실물 통계 그래프</title>
+  <style>
+    body { font-family: sans-serif; background:#f6f7fb; margin:0; }
+    .wrap {
+      width: min(1100px, 96vw);
+      margin: 40px auto;
+      background: white;
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    }
+    .top {
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 14px;
+    }
+    .controls {
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .controls label { font-size: 13px; color:#333; }
+    input, select {
+      padding: 8px 10px;
+      border:1px solid #ddd;
+      border-radius: 10px;
+      background:#fff;
+    }
+    button {
+      padding: 9px 12px;
+      border:none;
+      border-radius: 10px;
+      background:#111827;
+      color:#fff;
+      cursor:pointer;
+      font-weight:600;
+    }
+    .grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .card {
+      background:#fff;
+      border:1px solid #eee;
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    .title {
+      font-weight:800;
+      margin: 0 0 10px 0;
+      font-size: 15px;
+    }
+    .hint {
+      font-size: 12px;
+      color:#666;
+      margin-top: -6px;
+      margin-bottom: 10px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div style="font-weight:900; font-size:18px;">📊 분실물 통계</div>
+        <div style="font-size:12px; color:#666;">날짜 선택 → 그 날짜에 잃어버린 제품(카테고리) 분포 + 최근 N일 추이</div>
+      </div>
+
+      <div class="controls">
+        <label>날짜</label>
+        <input id="datePick" type="date" value="{{ default_date }}" />
+
+        <label>최근 N일</label>
+        <select id="daysPick">
+          <option value="7">7일</option>
+          <option value="14" selected>14일</option>
+          <option value="30">30일</option>
+          <option value="60">60일</option>
+        </select>
+
+        <label>테이블</label>
+        <select id="tablePick">
+          <option value="item_lost" selected>item_lost(분실 신고)</option>
+          <option value="item">item(발견/보관)</option>
+        </select>
+
+        <button id="btnLoad">조회</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">선택 날짜 카테고리별 분실 건수</div>
+        <div class="hint" id="dateTitle"></div>
+        <canvas id="barChart"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">최근 N일 일별 분실 건수 추이</div>
+        <div class="hint" id="trendTitle"></div>
+        <canvas id="lineChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const datePick = document.getElementById("datePick");
+    const daysPick = document.getElementById("daysPick");
+    const tablePick = document.getElementById("tablePick");
+    const btnLoad = document.getElementById("btnLoad");
+
+    const dateTitle = document.getElementById("dateTitle");
+    const trendTitle = document.getElementById("trendTitle");
+
+    let barChart = null;
+    let lineChart = null;
+
+    function destroyIfExists(chart) {
+      if (chart) chart.destroy();
+      return null;
+    }
+
+    async function loadData() {
+      const date = datePick.value;
+      const days = daysPick.value;
+      const table = tablePick.value;
+
+      const url = `/ad_graph/data?date=${encodeURIComponent(date)}&days=${encodeURIComponent(days)}&table=${encodeURIComponent(table)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      // 타이틀 업데이트
+      dateTitle.textContent = `${data.selected_date} (source: ${data.table})`;
+      const start = data.trend_daily.labels[0];
+      const end = data.trend_daily.labels[data.trend_daily.labels.length - 1];
+      trendTitle.textContent = `${start} ~ ${end} (source: ${data.table})`;
+
+      // bar chart
+      const barLabels = data.by_category.labels;
+      const barCounts = data.by_category.counts;
+
+      barChart = destroyIfExists(barChart);
+      barChart = new Chart(document.getElementById("barChart"), {
+        type: "bar",
+        data: {
+          labels: barLabels.length ? barLabels : ["데이터 없음"],
+          datasets: [{
+            label: "건수",
+            data: barLabels.length ? barCounts : [0],
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // line chart
+      const lineLabels = data.trend_daily.labels;
+      const lineCounts = data.trend_daily.counts;
+
+      lineChart = destroyIfExists(lineChart);
+      lineChart = new Chart(document.getElementById("lineChart"), {
+        type: "line",
+        data: {
+          labels: lineLabels,
+          datasets: [{
+            label: "일별 건수",
+            data: lineCounts,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: true } },
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    }
+
+    btnLoad.addEventListener("click", loadData);
+    window.addEventListener("load", loadData);
+  </script>
+</body>
+</html>
