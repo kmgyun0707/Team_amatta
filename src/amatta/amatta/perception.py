@@ -41,7 +41,7 @@ class Detect_to_Lossitem(Node):
         # __init__ 내부 수정
         qos_profile = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
-            depth=10
+            depth=2
         )
 
         self.name_space = self.get_namespace()
@@ -55,7 +55,7 @@ class Detect_to_Lossitem(Node):
         self.rgb_sub = message_filters.Subscriber(self, CompressedImage, f'{self.name_space}/oakd/rgb/image_raw/compressed',qos_profile=qos_profile)
         self.depth_sub = message_filters.Subscriber(self, Image, f'{self.name_space}/oakd/stereo/image_raw',qos_profile=qos_profile)
         # slop은 환경에 따라 0.05~0.2 사이에서 조절하세요.
-        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 3)
+        self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 100, 0.5) #수정 
         self.ts.registerCallback(self.synchronized_callback)
      
         self.is_detected = self.create_publisher(DetectionInfo, f'{self.name_space}/is_detected',10) # 이건 네임스페이스 없이 발행
@@ -123,7 +123,7 @@ class Detect_to_Lossitem(Node):
 
                         #확인 로그 추가
                         self.get_logger().info(f'검출된 객체: {label_name}, 신뢰도: {confidence}, 깊이 값(z): {z}m')
-                        if z <= 0.1 or z > 5.0: # 유효 거리 범위 체크 (0.1m ~ 5.0m) 
+                        if z <= 0.1 or z > 2.2: # 유효 거리 범위 체크 (0.1m ~ 5.0m) 
                             continue
 
                         # 3. 2D->3D 좌표 변환

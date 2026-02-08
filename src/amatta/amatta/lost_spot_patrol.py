@@ -146,7 +146,10 @@ class LostItemPatrol(Node):
         self.goal_x = msg.goal.pose.position.x
         self.goal_y = msg.goal.pose.position.y
 
-        self.offset_goal_pose = self.get_offset_pose(self.goal_x, self.goal_y, offset_dist=0.6) # offset_dist 튜닝 필요: dist 절반 시도해보기
+        # self.offset_goal_pose = self.get_offset_pose(self.goal_x, self.goal_y, offset_dist=0.6) # offset_dist 튜닝 필요: dist 절반 시도해보기
+
+        temp_target_pose = self.create_pose(self.goal_x, self.goal_y, 0.0, 1.0)
+        self.offset_goal_pose = self.get_offset_pose(temp_target_pose, offset_dist=0.6)
 
         if msg.detected and not self.detected_self:
             self.get_logger().info("I (Robot 1) FOUND IT! Stopping.")
@@ -176,39 +179,15 @@ class LostItemPatrol(Node):
             self.navigator.cancelTask()
             self.stop_robot()
     
-    # 오프셋 계산 함수
-    def get_offset_pose(self, target_x, target_y, offset_dist=0.1):
-        """
-        현재 로봇 위치에서 타겟 위치를 바라보는 방향으로, 
-        타겟보다 offset_dist 만큼 덜 간 위치를 계산하여 반환
-        """
-        # 현재 로봇의 위치 가져오기 (피드백이 없으면 0,0 처리)
-        feedback = self.navigator.getFeedback()
-        if feedback:
-            robot_x = feedback.current_pose.pose.position.x
-            robot_y = feedback.current_pose.pose.position.y
-        else:
-            self.get_logger().info('로봇 위치를 못 불러옵니다.')
-            return None
+    # 수정된 get_offset_pose
+    def get_offset_pose(self, target_pose, offset_dist=0.6):
+        if not self.current_pose: return target_pose
+        rx, ry = self.current_pose.pose.position.x, self.current_pose.pose.position.y
+        tx, ty = target_pose.pose.position.x, target_pose.pose.position.y
+        theta = math.atan2(ty - ry, tx - rx)
+        return self.create_pose(tx - offset_dist*math.cos(theta), ty - offset_dist*math.sin(theta), 0.0, 1.0)
 
-
-        # 1. 각도(theta) 계산
-        dx = target_x - robot_x
-        dy = target_y - robot_y
-        theta = math.atan2(dy, dx)
-
-        # 2. 오프셋 좌표 계산 (타겟에서 로봇 쪽으로 offset_dist만큼 뺌)
-        safe_x = target_x - offset_dist * math.cos(theta)
-        safe_y = target_y - offset_dist * math.sin(theta)
-
-        # 3. PoseStamped 생성
-        offset_pose = self.navigator.getPoseStamped([safe_x, safe_y], TurtleBot4Directions.EAST)
-        
-        # (선택사항) 도착했을 때 RC카를 바라보도록 방향(Orientation) 설정하려면 쿼터니언 변환 필요
-        # 현재는 간단하게 EAST로 설정함
-        
-        return offset_pose
-
+    
     # ---------------- Control Logic ----------------
 
     def check_and_start_patrol(self):
@@ -251,7 +230,7 @@ class LostItemPatrol(Node):
             target_pose = self.goal_options[index]['pose']
 
             self.get_logger().info(f"Moving to {target_name}...")
-            self.navigator.goToPose(target_pose)
+            self.navigator.startToPose(target_pose)
 
             # 2. 이동 중 감시 루프
             while not self.navigator.isTaskComplete():
@@ -265,7 +244,7 @@ class LostItemPatrol(Node):
                 # [충돌 방지] Robot 3와 거리 체크
                 if self.check_proximity_and_yield():
                     # 양보하느라 멈췄다면, 다시 현재 목표로 이동 명령
-                    self.navigator.goToPose(target_pose)
+                    self.navigator.startToPose(target_pose)
                 
                 time.sleep(0.1)
 
