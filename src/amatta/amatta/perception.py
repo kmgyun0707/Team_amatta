@@ -58,7 +58,7 @@ class Detect_to_Lossitem(Node):
         self.ts = message_filters.ApproximateTimeSynchronizer([self.rgb_sub, self.depth_sub], 10, 3)
         self.ts.registerCallback(self.synchronized_callback)
      
-        self.is_detected = self.create_publisher(DetectionInfo, '/is_detected',10) # 이건 네임스페이스 없이 발행
+        self.is_detected = self.create_publisher(DetectionInfo, f'{self.name_space}/is_detected',10) # 이건 네임스페이스 없이 발행
         self.db_pub = self.create_publisher(DetectionResult, '/db_post',10) 
         self.loss_item_view_pub = self.create_publisher(Image, f'{self.name_space}/tracking', 10)
         self.tf_buffer = Buffer()

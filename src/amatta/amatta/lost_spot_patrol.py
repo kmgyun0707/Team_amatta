@@ -29,6 +29,8 @@ class LostItemPatrol(Node):
         self.search_mode = False
         self.is_patrolling = False          # 스레드 중복 실행 방지
         self.patrol_thread = None
+        self.gate_id = None              # 게이트 ID
+        self.gate_pose = None             # 게이트 좌표
         
         self.visited_indices = []           # 사용자가 방문한 곳 (제외할 곳)
         self.target_indices = []            # 실제 탐색할 곳 (전체 - 방문한 곳)
@@ -89,10 +91,16 @@ class LostItemPatrol(Node):
             {'name': 'Mens_Room', 'pose': self.create_pose(-3.29, 2.6, 0.9980, 0.0631)}
         ]
 
+        self.gate_options = [
+            {'name': 'Gate_1', 'pose': self.create_pose(-0.60, -1.31, -0.6276, 0.7785)},
+            {'name': 'Gate_2', 'pose': self.create_pose(-2.13, -1.37, -0.7512, 0.66)},
+        ]
+        
+
         # ---------------- 초기화 ----------------
         if not self.navigator.getDockedStatus():
             self.navigator.dock()
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
+        initial_pose = self.navigator.getPoseStamped([0.0, 3.0], TurtleBot4Directions.NORTH)
         self.navigator.setInitialPose(initial_pose)
         self.navigator.waitUntilNav2Active()
         self.navigator.undock()
@@ -109,6 +117,8 @@ class LostItemPatrol(Node):
             self.get_logger().info("Search Mode: OFF")
 
     def db_callback(self, msg):
+        self.gate_id = msg.gate_id - 8
+        self.gate_pose = self.gate_options[self.gate_id]['pose']
         self.visited_indices = list(msg.visited_spots)
         self.get_logger().info(f"DB Info Received. Visited: {self.visited_indices}")
         
@@ -133,11 +143,31 @@ class LostItemPatrol(Node):
         self.peer_pose = msg # geometry_msgs/Pose
 
     def detection_self_callback(self, msg):
+        self.goal_x = msg.goal.pose.position.x
+        self.goal_y = msg.goal.pose.position.y
+
+        self.offset_goal_pose = self.get_offset_pose(self.goal_x, self.goal_y, offset_dist=0.6) # offset_dist 튜닝 필요: dist 절반 시도해보기
+
         if msg.detected and not self.detected_self:
             self.get_logger().info("I (Robot 1) FOUND IT! Stopping.")
             self.detected_self = True
             self.navigator.cancelTask()
             self.stop_robot()
+
+            # 분실물에 접근
+            self.get_logger().info(f'close to stuff')
+            self.navigator.startToPose(self.offset_goal_pose)
+            while not self.navigator.isTaskComplete():
+                time.sleep(0.1)
+            
+            # 분실물 수거 기다리기
+            self.get_logger().info(f'please put your lost item on robot3 head')
+            time.sleep(5.0)  
+            
+            # 게이트로 이동
+            self.navigator.startToPose(self.gate_pose)
+            while not self.navigator.isTaskComplete():
+                time.sleep(0.1)
 
     def detection_peer_callback(self, msg):
         if msg.detected and not self.detected_peer:
@@ -145,6 +175,39 @@ class LostItemPatrol(Node):
             self.detected_peer = True
             self.navigator.cancelTask()
             self.stop_robot()
+    
+    # 오프셋 계산 함수
+    def get_offset_pose(self, target_x, target_y, offset_dist=0.1):
+        """
+        현재 로봇 위치에서 타겟 위치를 바라보는 방향으로, 
+        타겟보다 offset_dist 만큼 덜 간 위치를 계산하여 반환
+        """
+        # 현재 로봇의 위치 가져오기 (피드백이 없으면 0,0 처리)
+        feedback = self.navigator.getFeedback()
+        if feedback:
+            robot_x = feedback.current_pose.pose.position.x
+            robot_y = feedback.current_pose.pose.position.y
+        else:
+            self.get_logger().info('로봇 위치를 못 불러옵니다.')
+            return None
+
+
+        # 1. 각도(theta) 계산
+        dx = target_x - robot_x
+        dy = target_y - robot_y
+        theta = math.atan2(dy, dx)
+
+        # 2. 오프셋 좌표 계산 (타겟에서 로봇 쪽으로 offset_dist만큼 뺌)
+        safe_x = target_x - offset_dist * math.cos(theta)
+        safe_y = target_y - offset_dist * math.sin(theta)
+
+        # 3. PoseStamped 생성
+        offset_pose = self.navigator.getPoseStamped([safe_x, safe_y], TurtleBot4Directions.EAST)
+        
+        # (선택사항) 도착했을 때 RC카를 바라보도록 방향(Orientation) 설정하려면 쿼터니언 변환 필요
+        # 현재는 간단하게 EAST로 설정함
+        
+        return offset_pose
 
     # ---------------- Control Logic ----------------
 
