@@ -119,6 +119,11 @@ class Detect_to_Lossitem(Node):
                         # [추가2] 현재 박스 좌표 저장 (IoU 계산용)
                         current_box = [x1, y1, x2, y2]
                         label_name = self.classNames[int(box.cls[0])] if int(box.cls[0]) < len(self.classNames) else "Unknown" # 클래스 이름
+
+                        # [수정3] 'bag' 클래스 제외 로직 추가
+                        if label_name == 'bag':
+                            continue
+                        
                         confidence = float(box.conf[0]) # 신뢰도
 
                         # 이미지 범위 체크 (IndexError 방지)
