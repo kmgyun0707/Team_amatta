@@ -27,7 +27,7 @@
 | **김명균** | **이정현** | **이한빈** | **이주노**| **이채영**| **지승아** | **곽문정** | **진재협**|
 |:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:
 | <img src="https://github.com/user-attachments/assets/8c9a73f5-eb3f-43e9-b948-5df4af6962b2" alt="김명균" width="150"> | <img src="https://github.com/user-attachments/assets/83b67e17-3244-4a29-b00a-d53c72003ac2" alt="이정현" width="150"> | <img src="https://github.com/user-attachments/assets/0b5235c8-dc9d-45c8-a7dc-643f75ee4658" alt="이한빈" width="150"> | <img src="https://github.com/user-attachments/assets/ab667249-9c97-48f9-a814-98c1ddb2e596" alt="이주노" width="150"> |<img src="https://github.com/user-attachments/assets/68f09f42-26f0-43e1-a1c2-be847abdf51b" alt="이채영" width="150"> | <img src="https://github.com/user-attachments/assets/080978f8-b11d-4d55-8fc1-f2a343c55800" alt="지승아" width="150"> | <img src="https://github.com/user-attachments/assets/1085c3e9-daaa-4ab1-b9c1-4b6521022498" alt="곽문정" width="150"> | <img src="https://github.com/user-attachments/assets/a343d99d-e1ab-4d95-86e5-ebcddd00bafc" alt="진재협" width="150"> |
-| PM | Detection | Detection | FE/DB | FE/DB | AMR | AMR | YOLO |
+| PM | Detection | Detection | FE/DB | FE/DB | AMR | AMR | AMR |
 | [GitHub](https://github.com/kmgyun0707) | [GitHub](https://github.com/jhlgitloop) | [GitHub](https://github.com/ddiw) | [GitHub](https://github.com/dlwnsh925) | [GitHub](https://github.com/yichaeyoung) | [GitHub](https://github.com/seounga) | [GitHub](https://github.com/merong564) | [GitHub](https://github.com/comport98) |
 
 
