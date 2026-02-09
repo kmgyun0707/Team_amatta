@@ -286,7 +286,7 @@ def main(args=None):
 # ######################################################################
 
     # 경로 확인 비판: 파일이 실제로 있는지 확인하는 로직을 넣으면 더 좋습니다.
-    model_path = '/home/rokey/Desktop/Team_amatta/model/260207_yolo11n.pt'
+    model_path = '/home/rokey/Desktop/Team_amatta/model/best.pt'
     model = YOLO(model_path)
     
     rclpy.init(args=args)
