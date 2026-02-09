@@ -223,7 +223,7 @@ project/
 ├── config/
 │   └── nav2_amatta.yaml
 ├── launch/
-│   └── robot3.launch.py
+│   └── robot3.launch.py                        # Robot 3의 Nav2 내비게이션 및 핵심 기능(인식, 안내, 기록 기반 순찰) 노드를 일괄 실행하는 런치 파일
 ├── maps/
 │   ├── map.pgm
 │   └── map.yaml
@@ -232,10 +232,10 @@ project/
 ├── src/
 │   ├── amatta
 │   │   └── amatta 
-│   │       ├── guide_to_info.py
-│   │       ├── lost_spot_patrol.py    
-│   │       ├── perception.py
-│   │       └── visited_history_patrol.py                   
+│   │       ├── guide_to_info.py                # DB 조회 결과(등록/미등록)에 따라 '보관소 안내 모드'와 '탐색 모드' 간의 전환을 제어하는 매니저 노드
+│   │       ├── lost_spot_patrol.py             # (Robot 1) 승객이 방문하지 않은 나머지 구역을 우선적으로 탐색하는 순찰 로직
+│   │       ├── perception.py                   # RGB-D 카메라와 YOLO 모델을 활용해 분실물을 인식하고 3D 공간 좌표로 변환하는 비전 처리 노드
+│   │       └── visited_history_patrol.py       # (Robot 3) 승객의 과거 방문 기록(DB)을 기반으로 해당 경로를 역추적하며 탐색하는 순찰 로직          
 │   ├── airport_guide_interfaces
 │   │   └── msg
 │   │       ├── Dbinfo.msg
