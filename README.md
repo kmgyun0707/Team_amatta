@@ -1,5 +1,5 @@
-# Amatta!(Airport Lost and Found Robot)
-# 아마따!(공항 분실물 관리 로봇)
+# Amatta! (Airport Lost and Found Robot)
+# 아마따! (공항 분실물 관리 로봇)
 
 - ROKEY 부트캠프 6기 E1조, E3조 "아마따!" 팀의 프로젝트 레포지토리입니다.
 
@@ -26,9 +26,9 @@
   
 | **김명균** | **이정현** | **이한빈** | **이주노**| **이채영**| **지승아** | **곽문정** | **진재협**|
 |:------:|:------:|:------:|:------:|:------:|:------:|:------:|:------:
-| <img src="https://github.com/user-attachments/assets/ab576294-86aa-4364-bf40-13cbf76a426a" alt="곽문정" width="150"> | <img src="https://github.com/user-attachments/assets/41ed25b8-1832-4552-9f2e-cc96acb3bfee" alt="지승아" width="150"> | <img src="https://github.com/user-attachments/assets/d0da2053-ebf6-42c3-86e2-828177631ba2" alt="이주노" width="150"> | <img src="https://github.com/user-attachments/assets/d0da2053-ebf6-42c3-86e2-828177631ba2" alt="이주노" width="150"> |<img src="https://github.com/user-attachments/assets/bc5b8629-ec6a-4cae-b70f-1c8449b206e7" alt="이채영" width="150"> | <img src="https://github.com/user-attachments/assets/41ed25b8-1832-4552-9f2e-cc96acb3bfee" alt="지승아" width="150"> | <img src="https://github.com/user-attachments/assets/ab576294-86aa-4364-bf40-13cbf76a426a" alt="곽문정" width="150"> | <img src="https://github.com/user-attachments/assets/8db457f6-efca-4a0c-898a-6973ecef9f78" alt="진재협" width="150"> |
+| <img src="https://github.com/user-attachments/assets/8c9a73f5-eb3f-43e9-b948-5df4af6962b2" alt="김명균" width="150"> | <img src="https://github.com/user-attachments/assets/83b67e17-3244-4a29-b00a-d53c72003ac2" alt="이정현" width="150"> | <img src="https://github.com/user-attachments/assets/0b5235c8-dc9d-45c8-a7dc-643f75ee4658" alt="이한빈" width="150"> | <img src="https://github.com/user-attachments/assets/ab667249-9c97-48f9-a814-98c1ddb2e596" alt="이주노" width="150"> |<img src="https://github.com/user-attachments/assets/68f09f42-26f0-43e1-a1c2-be847abdf51b" alt="이채영" width="150"> | <img src="https://github.com/user-attachments/assets/080978f8-b11d-4d55-8fc1-f2a343c55800" alt="지승아" width="150"> | <img src="https://github.com/user-attachments/assets/1085c3e9-daaa-4ab1-b9c1-4b6521022498" alt="곽문정" width="150"> | <img src="https://github.com/user-attachments/assets/a343d99d-e1ab-4d95-86e5-ebcddd00bafc" alt="진재협" width="150"> |
 | PM | Detection | Detection | FE/DB | FE/DB | AMR | AMR | YOLO |
-| [GitHub](https://github.com/merong564) | [GitHub](https://github.com/seounga) | [GitHub](https://github.com/dlwnsh925) | [GitHub](https://github.com/dlwnsh925) | [GitHub](https://github.com/yichaeyoung) | [GitHub](https://github.com/seounga) | [GitHub](https://github.com/merong564) | [GitHub](https://github.com/comport98) |
+| [GitHub](https://github.com/kmgyun0707) | [GitHub](https://github.com/jhlgitloop) | [GitHub](https://github.com/ddiw) | [GitHub](https://github.com/dlwnsh925) | [GitHub](https://github.com/yichaeyoung) | [GitHub](https://github.com/seounga) | [GitHub](https://github.com/merong564) | [GitHub](https://github.com/comport98) |
 
 
 # 3. 실행 가이드
@@ -221,28 +221,28 @@ cd ~/Desktop/DTHRC/DTHRC
 ```plaintext
 project/
 ├── config/
-│   ├── nav2_amatta.yaml
+│   └── nav2_amatta.yaml
 ├── launch/
-│   ├── robot3.launch.py
+│   └── robot3.launch.py
 ├── maps/
 │   ├── map.pgm
-│   ├── map.yaml
+│   └── map.yaml
 ├── model/
-│   ├── best.pt
+│   └── best.pt
 ├── src/
 │   ├── amatta
-│   │   ├── amatta 
-│   │   │   ├── guide_to_info.py
-│   │   │   ├── lost_spot_patrol.py    
-│   │   │   ├── perception.py
-│   │   │   └── visited_history_patrol.py                   
+│   │   └── amatta 
+│   │       ├── guide_to_info.py
+│   │       ├── lost_spot_patrol.py    
+│   │       ├── perception.py
+│   │       └── visited_history_patrol.py                   
 │   ├── airport_guide_interfaces
-│   │   ├── msg
-│   │   │   ├── Dbinfo.msg
-│   │   │   └── DetectionInfo.msg                   
-│   ├── my_robot_interfaces
 │   │   └── msg
-│   │       └── DetectionResult.msg                   
+│   │       ├── Dbinfo.msg
+│   │       └── DetectionInfo.msg                   
+│   └── my_robot_interfaces
+│       └── msg
+│           └── DetectionResult.msg                   
 ├── src/
 │   └── rmpflow_controller.py     
 └── README.md
@@ -251,31 +251,47 @@ project/
 ### Web Folder
 ```plaintext
 project/
-├── config/
-│   ├── nav2_amatta.yaml
-├── launch/
-│   ├── robot3.launch.py
-├── maps/
-│   ├── map.pgm
-│   ├── map.yaml
-├── model/
-│   ├── best.pt
+├── sql/
+│   ├── amatta.db
+│   ├── column.sql
+│   └── lost_item.sql
 ├── src/
-│   ├── amatta
-│   │   ├── amatta 
-│   │   │   ├── guide_to_info.py
-│   │   │   ├── lost_spot_patrol.py    
-│   │   │   ├── perception.py
-│   │   │   └── visited_history_patrol.py                   
 │   ├── airport_guide_interfaces
-│   │   ├── msg
-│   │   │   ├── Dbinfo.msg
-│   │   │   └── DetectionInfo.msg                   
-│   ├── my_robot_interfaces
-│   │   └── msg
-│   │       └── DetectionResult.msg                   
-├── src/
-│   └── rmpflow_controller.py     
+│   └── my_robot_interfaces
+├── static/
+├── template/
+│   ├── user_login_center.html
+│   ├── user_item.html
+│   ├── search_start.py
+│   ├── search_success.html
+│   ├── search_fail.html
+│   ├── lost_report.html
+│   ├── item.html
+│   ├── guide_start.html
+│   ├── ad_login_center.html
+│   ├── ad_login.html
+│   ├── ad_graph_test.html
+│   ├── ad_graph.html
+│   └── ad_detect.html
+├── web/
+│   ├── user_load_db.py
+│   ├── test_pub_dbinfo.py
+│   ├── search_start.py
+│   ├── ros_monitor.py
+│   ├── lost_test.py
+│   ├── lost_report.py
+│   ├── location_mapper.py
+│   ├── guide_start.py
+│   ├── ad_load_db.py
+│   ├── location_mapper.py
+│   ├── ad_graph.py
+│   └── ad_detect.py
+├── api_test.py
+├── found_item_listener.py
+├── result_listener.py                 
+├── test_dbinfo_subscriber.py
+├── main.py
+├── user_item_list_qr.png
 └── README.md
 ```
 
