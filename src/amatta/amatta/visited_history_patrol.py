@@ -4,6 +4,7 @@ from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+import rclpy.logging 
 
 # TurtleBot4 & Nav2 Imports
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
@@ -25,6 +26,9 @@ class VisitedHistoryPatrol(Node):
         
         self.callback_group = ReentrantCallbackGroup()
         self.navigator = TurtleBot4Navigator()
+
+        # Nav2 네비게이터의 불필요한 "Getting path..." 로그 숨기기 (INFO -> WARN)
+        self.navigator.get_logger().set_level(rclpy.logging.LoggingSeverity.WARN)
 
         # 상태 변수
         self.search_mode = False            
@@ -87,23 +91,12 @@ class VisitedHistoryPatrol(Node):
             {'name': 'Gate_2', 'pose': self.create_pose(-2.18, -1.26, -0.7512, 0.66)},
         ]
 
-        # ---------------- 초기화 ----------------
-        # if not self.navigator.getDockedStatus():
-        #      self.navigator.dock()
-        # initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
-        # self.navigator.setInitialPose(initial_pose)
-        # self.navigator.waitUntilNav2Active()
-        # self.navigator.undock()
-        # self.get_logger().info("Robot 3 Ready.")
-
-
     # ---------------- Callbacks ----------------
 
     def search_mode_callback(self, msg):
         self.search_mode = msg.data
         if self.search_mode:
             self.get_logger().info("Search Mode: ON")
-            # 모드가 켜질 때 조건 확인
             self.check_and_start_patrol()
         else:
             self.get_logger().info("Search Mode: OFF")
@@ -123,8 +116,6 @@ class VisitedHistoryPatrol(Node):
             self.gate_pose = self.gate_options[self.gate_id]['pose']
         
         self.get_logger().info(f"Received Path: {self.visited_spots}")
-        
-        # 경로 데이터가 들어왔을 때 조건 확인
         self.check_and_start_patrol()
 
     def pose_callback(self, msg):
@@ -134,139 +125,101 @@ class VisitedHistoryPatrol(Node):
         self.current_pose = p
 
     def detection_robot1_callback(self, msg):
-        # [수정] 감지되어도 무시하도록 변경
-        if msg.detected:
-             return
-        
-        # if msg.detected and not self.detected_robot1:
-        #     self.get_logger().info("ROBOT 1 DETECTED ITEM!")
-        #     self.detected_robot1 = True
-        #     self.item_location = msg.goal 
-        #     self.navigator.cancelTask()
-        #     self.stop_robot()
+        if msg.detected: return
 
     def detection_robot3_callback(self, msg):
-        # [수정] 감지되어도 무시하도록 변경
-        if msg.detected:
-             return
-
-        # if msg.detected and not self.detected_robot3:
-        #     self.get_logger().info("ROBOT 3 DETECTED ITEM!")
-        #     self.detected_robot3 = True
-
-        #     self.item_location = msg.goal
-
-        #     self.navigator.cancelTask()
-        #     self.stop_robot()
-
-        #     # 접근 (이제 self.item_location이 None이 아니므로 에러가 나지 않습니다)
-        #     if self.item_location is not None:
-        #         approach_pose = self.get_offset_pose(self.item_location, 0.6)
-        #         self.navigator.startToPose(approach_pose)
-        #         while not self.navigator.isTaskComplete(): time.sleep(0.1)
-                
-        #         # 대기
-        #         self.get_logger().info("Waiting for load...")
-        #         time.sleep(7.0)
-                
-        #         # 게이트 이동
-        #         if self.gate_pose:
-        #             self.get_logger().info(f"Going to Gate...")
-        #             self.navigator.startToPose(self.gate_pose)
-        #             while not self.navigator.isTaskComplete(): time.sleep(0.1)
-        #     else:
-        #         self.get_logger().error("Detected item but location is None")
+        if msg.detected: return
 
     # ---------------- Control Logic ----------------
 
     def check_and_start_patrol(self):
-        """
-        콜백에서 호출되는 함수. 조건이 맞으면 '스레드'를 생성하여 순찰을 보냄.
-        """
-        # 1. 이미 순찰 중이면 무시
         if self.is_patrolling:
             return
 
-        # 2. 탐색 모드 ON + 방문 장소 데이터 있음
         if self.search_mode and len(self.visited_spots) > 0:
             self.get_logger().info("Condition Met! Starting Patrol Thread...")
             self.is_patrolling = True
-            
-            # [중요] run_patrol을 별도 스레드로 실행 (콜백 블로킹 방지)
             self.patrol_thread = threading.Thread(target=self.run_patrol)
             self.patrol_thread.start()
 
     def run_patrol(self):
-        """
-        실제 로봇을 움직이는 긴 작업 (별도 스레드에서 실행됨)
-        """
         self.get_logger().info("Patrol Thread Started.")
         
-        # 위치 초기화 대기
-        if self.current_pose is None:
-            time.sleep(1.0)
-            if self.current_pose is None:
-                self.get_logger().warn("No Pose detected. Aborting.")
-                self.reset_state()
-                return
+        # [수정] 위치 초기화 대기 루프 (최대 5초 대기)
+        for _ in range(10):
+            if self.current_pose is not None:
+                break
+            self.get_logger().warn("Waiting for AMCL pose...")
+            time.sleep(0.5)
 
-        # 최단 경로 계산
+        if self.current_pose is None:
+            self.get_logger().error("No Pose detected after 5 seconds. Aborting.")
+            self.reset_state()
+            return
+
         start_pose = self.current_pose
+
+        # ================= [성능 비교 측정 구간 시작] =================
+        self.get_logger().info("--- 📊 Algorithm Performance Comparison Start ---")
+
+        # 1. Brute Force (유클리드 직선 거리) 측정
+        t0 = time.time()
+        route_bf, dist_bf = self.find_best_route_brute_force(start_pose, self.visited_spots)
+        t1 = time.time()
+        time_bf = t1 - t0
+
+        # 2. Nav2 Path (실제 주행 경로) 측정
+        t2 = time.time()
+        route_nav, dist_nav = self.find_best_route_using_nav2(start_pose, self.visited_spots)
+        t3 = time.time()
+        time_nav = t3 - t2
+
+        # 3. 결과 비교 로그 출력
+        self.get_logger().info(f"1. [Computation Time] BruteForce: {time_bf:.4f}s  vs  Nav2: {time_nav:.4f}s")
+        self.get_logger().info(f"2. [Total Distance]   BruteForce: {dist_bf:.2f}m    vs  Nav2: {dist_nav:.2f}m")
         
-        # [수정] Nav2 기반 경로 계산 사용
-        # best_route, _ = self.find_best_route_brute_force(start_pose, self.visited_spots)
-        best_route, _ = self.find_best_route_using_nav2(start_pose, self.visited_spots)
+        if route_bf == route_nav:
+            self.get_logger().info(f"3. [Route Result]     SAME Order: {route_nav}")
+        else:
+            self.get_logger().warn(f"3. [Route Result]     DIFFERENT Order!")
+            self.get_logger().warn(f"   - BruteForce Suggestion: {route_bf}")
+            self.get_logger().warn(f"   - Nav2 (Real) Suggestion: {route_nav}")
         
+        self.get_logger().info("--- 📊 Comparison End ---")
+        # ================= [성능 비교 측정 구간 끝] =================
+        
+        # [최적화] 위에서 계산한 Nav2 결과(route_nav)를 재사용
+        best_route = route_nav
+        
+        # 만약 Nav2 경로 계산이 모두 실패했다면, 차선책으로 Brute Force 사용
+        if not best_route:
+             self.get_logger().warn("Nav2 Path planning failed. Falling back to Brute Force.")
+             best_route = route_bf
+
+        self.get_logger().info(f"Final Patrol Route: {best_route}")
+
         # 이동 루프
         for index in best_route:
-            # [수정] 감지되어도 무시하므로 주석 처리
-            # # 이동 전 감지 확인
-            # if self.detected_robot1:
-            #     self.handle_retrieval_sequence()
-            #     self.reset_state()
-            #     return
-            # if self.detected_robot3:
-            #     self.reset_state()
-            #     return
-
             target_pose = self.goal_options[index]['pose']
             self.navigator.startToPose(target_pose)
 
-            # 이동 중 감시 루프
             while not self.navigator.isTaskComplete():
-                # [수정] 감지되어도 무시하므로 주석 처리
-                # if self.detected_robot1:
-                #     self.navigator.cancelTask()
-                #     self.stop_robot()
-                #     # self.handle_retrieval_sequence()
-                #     self.reset_state()
-                #     return
-                # if self.detected_robot3:
-                #     self.navigator.cancelTask()
-                #     self.stop_robot()
-                #     self.handle_retrieval_sequence()
-                #     self.reset_state()
-                #     return
                 time.sleep(0.1)
 
-            # 도착 확인
             result = self.navigator.getResult()
             if result == TaskResult.SUCCEEDED:
                 self.get_logger().info(f"Checked spot {index}.")
                 time.sleep(0.5)
 
-        # 모든 경로 탐색 종료 (못 찾음)
         if not self.detected_robot1 and not self.detected_robot3:
             self.get_logger().info("Patrol Finished. Item NOT found.")
             msg = Bool()
             msg.data = False
             self.is_found_pub.publish(msg)
         
-        # 종료 처리
         self.reset_state()
 
     def reset_state(self):
-        """순찰 종료 후 상태 초기화"""
         self.is_patrolling = False
         self.search_mode = False 
         self.visited_spots = [] 
@@ -274,7 +227,7 @@ class VisitedHistoryPatrol(Node):
         self.detected_robot3 = False
         self.get_logger().info("State Reset. Waiting for new commands...")
 
-    # --- Helper Functions (동일) ---
+    # --- Helper Functions ---
     def create_pose(self, x, y, z_orient, w_orient):
         pose = PoseStamped()
         pose.header.frame_id = 'map'
@@ -285,38 +238,35 @@ class VisitedHistoryPatrol(Node):
         pose.pose.orientation.w = float(w_orient)
         return pose
     
-    # [수정] Nav2 getPath를 이용한 경로 길이 계산 헬퍼 함수 추가
     def calculate_nav_path_length(self, start, end):
         """
-        Navigator의 getPath를 호출하여 실제 경로(Path)를 받아오고,
-        그 경로의 총 길이를 계산하여 반환합니다.
+        Navigator의 getPath를 호출하여 실제 경로 길이를 계산.
+        잦은 호출로 인한 에러를 방지하기 위해 딜레이와 예외 처리를 추가함.
         """
-        # 경로 생성 요청 (Plan)
-        path = self.navigator.getPath(start, end)
-        
-        if path is None or len(path.poses) < 2:
-            return float('inf')  # 경로 생성 실패 시 무한대 거리 반환
-
-        total_dist = 0.0
-        # 생성된 경로의 점들을 순회하며 거리 누적
-        for i in range(len(path.poses) - 1):
-            p1 = path.poses[i].pose.position
-            p2 = path.poses[i+1].pose.position
-            dist = math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
-            total_dist += dist
+        try:
+            time.sleep(0.1)
+            path = self.navigator.getPath(start, end)
             
-        return total_dist
+            if path is None or len(path.poses) < 2:
+                return float('inf')
 
-    # [수정] getPath를 사용하여 순열 중 최단 경로를 찾는 함수 추가
+            total_dist = 0.0
+            for i in range(len(path.poses) - 1):
+                p1 = path.poses[i].pose.position
+                p2 = path.poses[i+1].pose.position
+                dist = math.sqrt((p1.x - p2.x)**2 + (p1.y - p2.y)**2)
+                total_dist += dist
+                
+            return total_dist
+
+        except Exception as e:
+            self.get_logger().warn(f"Path planning failed (ignored): {e}")
+            return float('inf')
+
     def find_best_route_using_nav2(self, start_pose, spots_indices):
-        """
-        가능한 모든 순서(Permutations)에 대해 Nav2 getPath로 실제 주행 거리를 계산하고,
-        가장 짧은 이동 거리를 가지는 순서를 반환합니다.
-        """
         min_total_distance = float('inf')
         best_order = []
         
-        # 인덱스 유효성 검사
         valid_indices = [i for i in spots_indices if i < len(self.goal_options)]
         if not valid_indices: return [], 0.0
 
@@ -324,7 +274,6 @@ class VisitedHistoryPatrol(Node):
         
         self.get_logger().info("Calculating optimal path using Nav2 getPath... (This might take a moment)")
 
-        # 모든 방문 순서 조합에 대해
         for path in itertools.permutations(valid_indices):
             current_total_dist = 0.0
             curr_pose = start_pose
@@ -332,17 +281,14 @@ class VisitedHistoryPatrol(Node):
             
             for idx in path:
                 target_pose = options_poses[idx]
-                
-                # Nav2 Plan 계산 호출
                 dist_segment = self.calculate_nav_path_length(curr_pose, target_pose)
                 
-                # 경로 생성 실패 시 이 조합은 버림
                 if dist_segment == float('inf'):
                     valid_path = False
                     break
                     
                 current_total_dist += dist_segment
-                curr_pose = target_pose # 다음 구간의 시작점은 현재 구간의 도착점
+                curr_pose = target_pose
             
             if valid_path and current_total_dist < min_total_distance:
                 min_total_distance = current_total_dist
@@ -351,14 +297,12 @@ class VisitedHistoryPatrol(Node):
         self.get_logger().info(f"Optimal Path Found! Total Distance: {min_total_distance:.2f}m")
         return best_order, min_total_distance
 
-
     def find_best_route_brute_force(self, start_pose, spots_indices):
         min_distance = float('inf')
         best_order = []
         valid_indices = [i for i in spots_indices if i < len(self.goal_options)]
         if not valid_indices: return [], 0.0
         
-        # pose 객체만 미리 추출하여 계산 속도 향상
         options_poses = {i: self.goal_options[i]['pose'] for i in valid_indices}
 
         for path in itertools.permutations(valid_indices):
@@ -366,7 +310,6 @@ class VisitedHistoryPatrol(Node):
             curr = start_pose
             for idx in path:
                 tgt = options_poses[idx]
-                # 거리 계산
                 dx = tgt.pose.position.x - curr.pose.position.x
                 dy = tgt.pose.position.y - curr.pose.position.y
                 current_dist += math.sqrt(dx*dx + dy*dy)
@@ -394,16 +337,13 @@ class VisitedHistoryPatrol(Node):
         if not self.item_location: return
         self.get_logger().info("Retrieving Item...")
         
-        # 접근
         approach_pose = self.get_offset_pose(self.item_location, 0.6)
         self.navigator.startToPose(approach_pose)
         while not self.navigator.isTaskComplete(): time.sleep(0.1)
         
-        # 대기
         self.get_logger().info("Waiting for load...")
         time.sleep(7.0)
         
-        # 게이트 이동
         if self.gate_pose:
             self.get_logger().info(f"Going to Gate...")
             self.navigator.startToPose(self.gate_pose)
@@ -413,12 +353,10 @@ def main(args=None):
     rclpy.init(args=args)
     tracer = VisitedHistoryPatrol()
     
-    # Executor 설정
     executor = MultiThreadedExecutor()
     executor.add_node(tracer)
 
     try:
-        # 이제 main은 오직 spin만 담당!
         executor.spin()
     except KeyboardInterrupt:
         pass
