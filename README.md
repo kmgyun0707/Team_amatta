@@ -297,23 +297,28 @@ project/
 
 # 5. 주요 기능
 
-### 5.1  Motion Control (RMPflow & FSM)
- - RMPflow 기반 실시간 경로 생성
- - Approach → Grasp → Lift → Place → Release → Return
-   
-    FSM 기반 Pick & Place 공정 제어
+### 5.1  AMR Control (Nav2 & FSM)
+ - 실시간 협동 경로 생성 : 두 대의 AMR이 작업 구역을 분담하여 사각지대를 해소하고 최적의 탐색 동선을 생성합니다.
+ - 시나리오 기반 상태 제어 (FSM):
+   - Stand-by: QR 신고 접수 및 대기 
+   - Path Planning: 신고자 이동 경로 역추적 및 최적 경로 계산 
+   - Scanning: YOLO 기반 분실물 탐색 수행
+   - Recovery: 분실물 발견 및 수거
+   - Delivery: 지정 게이트로 물품 전달 및 업무 종료
 
-### 5.2 Perception (YOLOv8s)
- - 볼트(Bolt), 너트(Nut) 실시간 객체 인식
- - mAP50 ≥ 92.7%
- - Sim2Real 데이터 확장을 통한 환경 변화 대응
+### 5.2 Perception (YOLO11n)
+ - 분실물 실시간 객체 인식 : 지갑, 스마트폰, 여권 등 주요 분실물을 탐지합니다.
+ - 최적 모델 선정 및 성능:
+   -  모델: YOLO11n (C3k2 Block 기반 특징 추출 강화)
+   -  정확도: mAP50 기준 94.26% 달성
+   -  지연율: 1.55ms의 추론 속도로 통신 지연 상쇄 및 안전 마진 확보
 
-### 5.3 Safety Stack
- - LiDAR Semantics 기반 작업자 인식
- - 거리 기반 3단계 안전 제어
-  - BLUE: 정상 동작
-  - YELLOW: 감속
-  - RED: 정지
+### 5.3 System Integration & Monitoring
+ - 웹-로봇 실시간 동기화 : Flask 기반 웹 인터페이스와 ROS2 토픽 통신을 통합하여 데이터 누락 없는 업로드를 구현합니다.
+ - 3단계 관리 시스템:
+   - 안내 모드: 습득물 DB 존재 시 보관소까지 길 안내 수행
+   - 탐색 모드: 미등록 물품 신고 시 로봇이 직접 순찰 및 탐지
+   - 관리 모드: 실시간 로봇 상태(배터리, 좌표) 및 DB 업데이트 모니터링
 
 # 6. 기술 스택 및 개발 환경
 
@@ -322,22 +327,16 @@ project/
   <img src="https://img.shields.io/badge/Python-3776AB?style=flat&logo=Python&logoColor=white" />
   <img src="https://img.shields.io/badge/nvidia-76B900?style=flat&logo=nvidia&logoColor=white" />
   <img src="https://img.shields.io/badge/yolo-111F68?style=flat&logo=nvidia&logoColor=white" />
+ <img src="https://img.shields.io/badge/ros-22314E?style=flat&logo=Python&logoColor=white" />
+  <img src="https://img.shields.io/badge/rockwellautomation-CD163F?style=flat&logo=Python&logoColor=white" />
+ <img src="https://img.shields.io/badge/opencv-5C3EE8?style=flat&logo=Python&logoColor=white" />
+ <img src="https://img.shields.io/badge/jira-0052CC.svg?&style=flaat&logo=github&logoColor=white" />
+ <img src="https://img.shields.io/badge/raspberrypi-A22846.svg?&style=flat&logo=notion&logoColor=white" />
+  <img src="https://img.shields.io/badge/flask-3BABC3?style=flat&logo=nvidia&logoColor=white" />
+  <img src="https://img.shields.io/badge/sqlite-003B57?style=flat&logo=nvidia&logoColor=white" />
   <img src="https://img.shields.io/badge/github-%23181717.svg?&style=flaat&logo=github&logoColor=white" />
   <img src="https://img.shields.io/badge/notion-%23000000.svg?&style=flat&logo=notion&logoColor=white" />
+  <img src="https://img.shields.io/badge/jira-0052CC.svg?&style=flaat&logo=github&logoColor=white" />
+ <img src="https://img.shields.io/badge/googledrive-4285F4.svg?&style=flat&logo=notion&logoColor=white" />
+  <img src="https://img.shields.io/badge/googlegemini-8E75B2.svg?&style=flaat&logo=github&logoColor=white" />
 </div><br>
-
-# 7. 아키텍쳐
-### 7.1 Input
- - LiDAR 센서: 작업자(Human)와 로봇 간 거리 측정
- - Camera 센서: 작업 대상물(Bolt / Nut) 이미지 입력
-
-### 7.2 Process
-  - core/safety.py : 작업자 거리 분석
-  - core/yolo.py : 작업 대상물 인식
-  - utils/rmpflow_controller.py : 최적 경로 계산
-  - core/pick_and_place.py : FSM 기반 작업 제어를 수행 (Approach → Grasp → Lift → Place → Release → Return)
-    - 한 사이클이 종료되면 자동으로 객체 전환
-
-### 7.3 Output
-  - 로봇 관절 속도 제어
-  - Surface Gripper 제어
